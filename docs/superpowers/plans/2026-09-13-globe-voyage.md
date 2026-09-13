@@ -17,7 +17,7 @@
 - Vite `base: '/'` (Vercel sert à la racine) ; URL finale `https://nano-adventure.vercel.app/`. Tous les fetchs d'assets passent par `import.meta.env.BASE_URL`.
 - Palette : noir `#141414`, or `#D9B65C`, crème `#F3EBD8`, fond de scène `#0B1026`. Polices : Anton (titres), Libre Baskerville (texte), via Google Fonts avec fallbacks `Impact, sans-serif` / `Georgia, serif`.
 - Étapes (dans cet ordre, indices 0–6) : Paris, Malaisie, Bali, Japon, Shanghai, Retour à Paris, Barcelone ; étape finale = indice 7 ; point d'attente = `'wait'`.
-- Le code en clair et le contenu de la révélation réel n'entrent **jamais** dans le repo : seuls `codeSalt`, `codeHash` (dans `src/content.js`) et `public/secret.enc` (chiffré) sont versionnés. Le secret de développement utilise le code `123456` et une destination factice (« QUELQUE PART »).
+- Le code en clair et le contenu de la révélation réel n'entrent **jamais** dans le repo : seul `public/secret.enc` (chiffré) est versionné ; aucun hash du code n'est publié (ruling tâche 4 : la vérification du code = succès du déchiffrement AES-GCM). Le secret de développement utilise le code `123456` et une destination factice (« QUELQUE PART »).
 - Crédits obligatoires (CC BY) : « Globe : Jacobs Development · Avion : Poly by Google — CC BY ».
 - Tests : `npm test` (vitest, environnement node) doit passer avant chaque commit.
 - Vérification visuelle : serveur Vite via `.claude/launch.json` à la racine de `kdodenano` (nom `dev`, port 5173, lance `npm --prefix site run dev`), page `http://localhost:5173/`, émulation mobile 375 × 812 pour les captures.
@@ -32,10 +32,10 @@
 | `index.html`, `src/styles.css` | Page unique, canvas + calque UI, tokens CSS, responsive |
 | `vite.config.js`, `vitest.config.js`, `package.json`, `.gitignore`, `.claude/launch.json` | Outillage |
 | `vercel.json` | Preset Vite + cache long sur `/models/` |
-| `src/content.js` | Données éditées par Denis (étapes, indice, sel/hash, crédits) |
+| `src/content.js` | Données éditées par Denis (étapes, indice, longueur du code, crédits) |
 | `src/lib/ease.js` | Easing, clamp, lerp |
 | `src/lib/geo.js` | lat/lon ↔ vecteur, slerp, arc, durée de vol |
-| `src/lib/crypto.js` | SHA-256, PBKDF2, AES-GCM (navigateur + Node) |
+| `src/lib/crypto.js` | PBKDF2 + AES-GCM (navigateur + Node) |
 | `src/lib/persist.js` | localStorage / sessionStorage |
 | `src/state.js` | Réducteur pur + prédicats `canNext/canPrev/canGoto` |
 | `src/app/store.js` | `createStore` : état courant, dispatch, abonnés |
@@ -2215,8 +2215,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `src/scene/plane.js` (ajout `hover`), `src/main.js`, `src/styles.css`
 
 **Interfaces:**
-- Produces: `createSecretVault({ url, codeSalt, codeHash }) → { ready(): Promise, get(): object|null, tryCode(code): Promise<{ok, secret?, corrupt?}> }` ; `createLockCard(root, { onOpen }) → { show({ hint }), hide() }` ; `createKeypad(root, { length, onSubmit(code), onClose }) → { open(), close(), shake(message), success() }` ; `createQuestionMark(dirVec, altitude=1.25, size=0.16) → { object, update(dt, t), fadeOut(seconds), hide() }` ; `plane.hover(t)` (oscillation autour de la dernière pose).
-- Consumes: `hashCode/decryptSecret` (Task 4), `persist` (Task 4), `SEAL` (Task 9).
+- Produces: `createSecretVault({ url, fetchImpl? }) → { ready(): Promise, get(): object|null, tryCode(code): Promise<{ok, secret?, missing?}> }` (`missing: true` si `secret.enc` est absent/illisible ; sinon `ok:false` = mauvais code) ; `createLockCard(root, { onOpen }) → { show({ hint }), hide() }` ; `createKeypad(root, { length, onSubmit(code), onClose }) → { open(), close(), shake(message), success() }` ; `createQuestionMark(dirVec, altitude=1.25, size=0.16) → { object, update(dt, t), fadeOut(seconds), hide() }` ; `plane.hover(t)` (oscillation autour de la dernière pose).
+- Consumes: `decryptSecret` (Task 4), `persist` (Task 4), `SEAL` (Task 9).
 
 - [ ] **Step 1 : Test du coffre**
 
@@ -2227,32 +2227,27 @@ import { createSecretVault } from '../src/app/secret.js';
 import { seal } from '../scripts/sealLib.mjs';
 
 const CONTENT = { destination: 'X', dates: 'Y', from: 'A', to: 'B', passengers: 'P', message: 'M' };
-
-async function vaultFor(code, override = {}) {
-  const { salt, hash, sealed } = await seal(code, CONTENT);
-  const fetch = async () => ({ ok: true, json: async () => override.sealed ?? sealed });
-  return createSecretVault({ url: 'x', codeSalt: salt, codeHash: override.hash ?? hash, fetchImpl: fetch });
-}
+const fetchOf = (body) => async () => ({ ok: true, json: async () => body });
 
 describe('secret vault', () => {
   it('bon code → secret en mémoire', async () => {
-    const v = await vaultFor('4321');
+    const { sealed } = await seal('4321', CONTENT);
+    const v = createSecretVault({ url: 'x', fetchImpl: fetchOf(sealed) });
     expect(v.get()).toBe(null);
     const r = await v.tryCode('4321');
     expect(r.ok).toBe(true); expect(r.secret).toEqual(CONTENT); expect(v.get()).toEqual(CONTENT);
   });
-  it('mauvais code → ok:false sans corrupt', async () => {
-    const v = await vaultFor('4321');
+  it('mauvais code → ok:false, rien en mémoire', async () => {
+    const { sealed } = await seal('4321', CONTENT);
+    const v = createSecretVault({ url: 'x', fetchImpl: fetchOf(sealed) });
     expect(await v.tryCode('0000')).toEqual({ ok: false });
+    expect(v.get()).toBe(null);
   });
-  it('hash bon mais fichier désynchronisé → corrupt', async () => {
-    const other = await seal('4321', { autre: 1 });
-    const v = await vaultFor('4321', { sealed: other.sealed });
-    const r = await v.tryCode('4321');
-    expect(r.ok).toBe(true);   // même code, autre contenu : déchiffre quand même
-    const { salt, hash } = await seal('9999', CONTENT);
-    const bad = createSecretVault({ url: 'x', codeSalt: salt, codeHash: hash, fetchImpl: async () => ({ ok: true, json: async () => other.sealed }) });
-    expect((await bad.tryCode('9999')).corrupt).toBe(true);
+  it('fichier absent (404) ou illisible → missing', async () => {
+    const v404 = createSecretVault({ url: 'x', fetchImpl: async () => ({ ok: false, json: async () => null }) });
+    expect(await v404.tryCode('4321')).toEqual({ ok: false, missing: true });
+    const vBad = createSecretVault({ url: 'x', fetchImpl: async () => { throw new Error('réseau'); } });
+    expect(await vBad.tryCode('4321')).toEqual({ ok: false, missing: true });
   });
 });
 ```
@@ -2264,9 +2259,10 @@ Run : `npm test` — Expected : FAIL, `secret.js` introuvable.
 - [ ] **Step 3 : Implémenter `src/app/secret.js`**
 
 ```js
-import { hashCode, decryptSecret } from '../lib/crypto.js';
+import { decryptSecret } from '../lib/crypto.js';
 
-export function createSecretVault({ url, codeSalt, codeHash, fetchImpl = (u) => globalThis.fetch(u) }) {
+// Coffre : charge secret.enc une fois ; la seule vérification du code est le succès du déchiffrement.
+export function createSecretVault({ url, fetchImpl = (u) => globalThis.fetch(u) }) {
   let sealed = null, plain = null;
   const loading = fetchImpl(url)
     .then((r) => (r.ok ? r.json() : null))
@@ -2277,12 +2273,12 @@ export function createSecretVault({ url, codeSalt, codeHash, fetchImpl = (u) => 
     get: () => plain,
     async tryCode(code) {
       await loading;
-      if (!codeHash || (await hashCode(code, codeSalt)) !== codeHash) return { ok: false };
+      if (!sealed) return { ok: false, missing: true };
       try {
         plain = await decryptSecret(code, sealed);
         return { ok: true, secret: plain };
       } catch {
-        return { ok: false, corrupt: true };
+        return { ok: false };
       }
     },
   };
@@ -2472,7 +2468,6 @@ export function createPlane(model) {
 
 Imports supplémentaires :
 ```js
-import { codeSalt, codeHash } from './content.js';
 import { persist } from './lib/persist.js';
 import { createSecretVault } from './app/secret.js';
 import { createLockCard } from './ui/lockCard.js';
@@ -2485,7 +2480,7 @@ if (new URLSearchParams(location.search).has('reset')) { persist.reset(); locati
 ```
 Remplacer `const store = createStore(initialState(), reduce);` par :
 ```js
-const vault = createSecretVault({ url: `${BASE}secret.enc`, codeSalt, codeHash });
+const vault = createSecretVault({ url: `${BASE}secret.enc` });
 const unlocked = persist.isUnlocked();
 let secretReady = false;
 if (unlocked && persist.getSessionCode()) secretReady = (await vault.tryCode(persist.getSessionCode())).ok;
@@ -2509,8 +2504,8 @@ const keypad = createKeypad(ui, {
       persist.setUnlocked(); persist.setSessionCode(code);
       keypad.success();
       setTimeout(() => dispatch('CODE_OK'), 400);
-    } else if (r.corrupt) {
-      keypad.shake('Le secret est corrompu, contacte Mimi.');
+    } else if (r.missing) {
+      keypad.shake('Le secret est introuvable, contacte Mimi.');
     } else {
       dispatch('CODE_KO');
       keypad.shake('Pas encore… relis bien la carte.');
@@ -2901,7 +2896,7 @@ Tout est dans `src/content.js` : titre, étapes (nom, sous-titre, dates, coordon
 npm install
 npm run seal
 ```
-Le script demande le contenu du billet, le message du verso et le code (masqué). Il écrit `public/secret.enc` (chiffré) et met à jour `codeSalt`/`codeHash` dans `src/content.js`. Le code et le contenu en clair ne sont jamais enregistrés. Mets `mystery.codeLength` à la longueur du code choisi.
+Le script demande le contenu du billet, le message du verso et le code (masqué). Il écrit `public/secret.enc` (chiffré AES-GCM, clé dérivée du code par PBKDF2). Le code et le contenu en clair ne sont jamais enregistrés, et aucun hash du code n'est publié : seul le bon code déchiffre le fichier. Mets `mystery.codeLength` à la longueur du code choisi.
 
 ## Développer
 ```bash

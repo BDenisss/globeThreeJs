@@ -39,7 +39,7 @@ site/
     models/plane.glb          avion
     secret.enc                révélation chiffrée (généré par `npm run seal`)
   src/
-    content.js                ← SEUL fichier édité par Denis (étapes, indice, hash)
+    content.js                ← SEUL fichier édité par Denis (étapes, indice, longueur du code)
     main.js                   démarrage : charge les modèles, crée scène + UI, boucle de rendu
     state.js                  machine à états (pure, testable, sans three.js)
     scene/
@@ -187,16 +187,16 @@ Une fois `REVEALED`, la 8e pastille devient normale ; revenir en arrière puis r
 ## 7. Verrou et chiffrement
 
 ### 7.1 Ce qui est publié
-- `content.js` contient `codeHash` = hex de `SHA-256(salt + code)` et `codeSalt` (16 octets aléatoires, hex).
 - `public/secret.enc` : JSON `{ v: 1, kdfSalt, iv, ciphertext }` (base64), où `ciphertext = AES-GCM-256(key, JSON du contenu)` et `key = PBKDF2-SHA256(code, kdfSalt, 200 000 itérations)`.
+- **Aucun hash du code n'est publié** (décision du 13/09 en revue de la tâche 4) : un `SHA-256(sel + code)` dans le bundle permettrait de retrouver un code à 6 chiffres hors ligne en quelques millisecondes (10⁶ candidats), contournant PBKDF2. La seule vérification est le succès du déchiffrement AES-GCM (tag d'authentification) : chaque essai coûte ~0,3 s de PBKDF2, hors ligne comme en ligne.
 - Le contenu clair (`{ destination, dates, from, to, passengers, message }`) n'existe **nulle part** dans le repo.
 
 ### 7.2 Côté navigateur (`lib/crypto.js`)
-- `hashCode(code, salt)` (SubtleCrypto `digest`) ; comparaison avec `codeHash`. Si égal → dérivation de clé et déchiffrement de `secret.enc` (fetch déjà fait au chargement). Si le déchiffrement échoue malgré le hash correct (fichier désynchronisé), message d'erreur clair en console et sur l'écran (« Le secret est corrompu, contacte Mimi »).
+- `decryptSecret(code, sealed)` : dérivation de clé puis déchiffrement de `secret.enc` (fetch déjà fait au chargement). Échec ⇒ mauvais code (message doux). Un fichier absent ou illisible affiche « Le secret est introuvable, contacte Mimi » (le script `seal` vérifie le déchiffrement avant d'écrire, un fichier corrompu est donc improbable).
 - Le contenu déchiffré est gardé en mémoire uniquement (jamais écrit en `localStorage`). Le code validé est copié dans `sessionStorage['nano.code']` (durée de vie : l'onglet). Au chargement, si `unlocked = 1` et que `sessionStorage` a le code, le secret est déchiffré silencieusement → l'arrivée à Londres donne directement `REVEALED`. Si le code n'est plus en session, l'arrivée donne `LOCKED(reentry)` : la carte demande « Entre à nouveau le code », et le bon code affiche le billet sans rejouer le vol. Ainsi la révélation est retrouvable pendant la lecture, mais jamais stockée en clair durablement.
 
 ### 7.3 `npm run seal` (`scripts/seal.mjs`, Node ≥ 20)
-Pose les questions en ligne de commande : code (masqué), destination, dates, gares, passagers, message (multi-ligne, terminé par une ligne vide). Génère `codeSalt`, `codeHash`, `public/secret.enc`, et **réécrit uniquement les lignes `codeSalt`/`codeHash`** de `content.js`. Vérifie en relisant que le déchiffrement fonctionne avant d'écrire. Affiche un récapitulatif sans le code.
+Pose les questions en ligne de commande : code (masqué), destination, dates, gares, passagers, message (multi-ligne, terminé par une ligne vide). Génère `public/secret.enc` (et rien d'autre : `content.js` n'est pas touché). Vérifie en relisant que le déchiffrement fonctionne avant d'écrire. Affiche un récapitulatif sans le code, avec la longueur attendue pour `mystery.codeLength`.
 
 ## 8. Contenu (`src/content.js`)
 
@@ -220,9 +220,6 @@ export const mystery = {
   destination: { lat: 51.5074, lon: -0.1278 },   // utilisé pour la position 3D seulement ; le nom vient du secret
 };
 
-export const codeSalt = "";   // rempli par `npm run seal`
-export const codeHash = "";   // rempli par `npm run seal`
-
 export const credits = "Globe : Jacobs Development · Avion : Poly by Google — CC BY";
 ```
 
@@ -245,7 +242,7 @@ Note : `mystery.destination` (lat/lon de Londres) est en clair dans `content.js`
 ### 10.1 Tests unitaires (vitest, `npm test`)
 - `geo` : `latLonToVec3` renvoie des vecteurs unitaires ; Paris/Londres/KL ont les signes attendus ; `slerp(a, b, 0.5)` de Paris → Tokyo a une latitude > 55° (passe par la Sibérie) ; `arcPoint(t=0.5)` est à l'altitude `1 + lift`.
 - `state` : séquence complète INTRO → … → LOCKED par `NEXT` ; `NEXT` ignoré pendant `FLYING` ; `GOTO` refusé vers une étape non visitée sauf la suivante ; `PREV` depuis `LOCKED` ramène à Barcelone ; `CODE_OK` → `UNLOCKING` → `LANDED` → `REVEALED` ; avec `unlocked = true` au départ, `NEXT` depuis Barcelone vole directement vers l'étape 7.
-- `crypto` : `seal` (fonctions pures extraites de `scripts/seal.mjs`) puis `lib/crypto` : bon code → contenu identique ; mauvais code → rejet sans exception non gérée ; `codeHash` change si le sel change.
+- `crypto` : `seal` (fonctions pures extraites de `scripts/seal.mjs`) puis `lib/crypto` : bon code → contenu identique ; mauvais code → rejet sans exception non gérée ; format inconnu → erreur explicite.
 
 ### 10.2 Vérification visuelle (navigateur intégré, émulation 375 × 812)
 Captures à chaque jalon : accueil chargé, arrivée à Malaisie (carte + route), vol en cours (avion orienté, route qui se dessine), état verrouillé (« ? » + carte cachet), pavé numérique, révélation (billet recto puis verso). Plus une capture en paysage 812 × 375 et une en desktop 1440 × 900.
