@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="c"><circle cx="32" cy="33" r="22"/></clipPath>
+    <clipPath id="front"><rect x="-20" y="33" width="104" height="60" transform="rotate(-18 32 33)"/></clipPath>
+    <radialGradient id="sea" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#7FD3FF"/><stop offset="1" stop-color="#2F86D6"/>
+    </radialGradient>
+  </defs>
+  <!-- anneau doré, moitié arrière -->
+  <ellipse cx="32" cy="33" rx="30" ry="10" transform="rotate(-18 32 33)" fill="none" stroke="#D9B65C" stroke-width="3"/>
+  <!-- planète -->
+  <circle cx="32" cy="33" r="22" fill="url(#sea)"/>
+  <g clip-path="url(#c)" fill="#5FC24E">
+    <path d="M14 22c5-6 12-6 15-2 2 3-1 6 2 9 2 2 6 2 7 6 1 5-4 8-8 8-6 0-8-4-12-6-5-3-7-9-4-15z"/>
+    <path d="M40 12c6 1 10 5 12 10 1 4-2 6-5 5-3-1-3-4-6-5-4-1-6-5-1-10z"/>
+    <path d="M38 40c4-1 8 1 9 5 1 4-3 8-8 8-4 0-7-4-6-8 1-3 3-4 5-5z"/>
+    <path d="M20 48c3-1 6 1 6 4 0 2-3 3-6 2-2-1-2-5 0-6z"/>
+  </g>
+  <circle cx="32" cy="33" r="22" fill="none" stroke="#1B4F8C" stroke-width="2"/>
+  <ellipse cx="23" cy="22" rx="5" ry="3" transform="rotate(-30 23 22)" fill="#fff" opacity=".55"/>
+  <!-- anneau, moitié avant, par-dessus la planète -->
+  <ellipse cx="32" cy="33" rx="30" ry="10" transform="rotate(-18 32 33)" fill="none" stroke="#D9B65C" stroke-width="3" clip-path="url(#front)"/>
+  <circle cx="59.9" cy="27.5" r="2.8" fill="#D9B65C"/>
+</svg>

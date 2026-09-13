@@ -14,7 +14,7 @@
 
 - Repo : `C:\Users\bucsp\Documents\kdodenano\site` (clone de https://github.com/BDenisss/globeThreeJs, branche `main`). Tous les chemins ci-dessous sont relatifs à cette racine.
 - **Ne jamais pousser (`git push`) sans que Denis le demande** ; commits locaux à chaque tâche.
-- Vite `base: '/'` (Vercel sert à la racine) ; URL finale = celle du projet Vercel (choisie par Denis à l'import, ex. `https://<projet>.vercel.app/`). Tous les fetchs d'assets passent par `import.meta.env.BASE_URL`.
+- Vite `base: '/'` (Vercel sert à la racine) ; URL finale `https://nano-adventure.vercel.app/`. Tous les fetchs d'assets passent par `import.meta.env.BASE_URL`.
 - Palette : noir `#141414`, or `#D9B65C`, crème `#F3EBD8`, fond de scène `#0B1026`. Polices : Anton (titres), Libre Baskerville (texte), via Google Fonts avec fallbacks `Impact, sans-serif` / `Georgia, serif`.
 - Étapes (dans cet ordre, indices 0–6) : Paris, Malaisie, Bali, Japon, Shanghai, Retour à Paris, Barcelone ; étape finale = indice 7 ; point d'attente = `'wait'`.
 - Le code en clair et le contenu de la révélation réel n'entrent **jamais** dans le repo : seuls `codeSalt`, `codeHash` (dans `src/content.js`) et `public/secret.enc` (chiffré) sont versionnés. Le secret de développement utilise le code `123456` et une destination factice (« QUELQUE PART »).
@@ -2912,7 +2912,7 @@ npm run build    # dossier dist/
 `?debug` dans l'URL : marqueurs rouges sur les villes + rotation libre à la souris. `?reset` : efface le déverrouillage mémorisé.
 
 ## Déployer
-Le repo est importé dans Vercel (preset Vite, sortie `dist/`) : chaque push sur `main` déclenche un build et une mise en ligne. L'URL est celle du projet Vercel.
+Le repo est importé dans Vercel (preset Vite, sortie `dist/`) : chaque push sur `main` déclenche un build et une mise en ligne sur https://nano-adventure.vercel.app/
 
 ## Crédits
 Globe : « Low Poly Planet Earth » par Jacobs Development (CC BY 4.0). Avion : « Airplane » par Poly by Google (CC BY 3.0).

@@ -1,7 +1,7 @@
 # Le voyage de Nano — site secret 3D (spec de conception)
 
 Date : 13 septembre 2026
-Repo : https://github.com/BDenisss/globeThreeJs (déployé sur Vercel — GitHub Pages abandonné le 13/09 : le compte GitHub bloque toute exécution d'Actions)
+Repo : https://github.com/BDenisss/globeThreeJs — en ligne : **https://nano-adventure.vercel.app/** (Vercel ; GitHub Pages abandonné le 13/09, le compte GitHub bloque toute exécution d'Actions)
 Statut : design validé section par section en conversation, à implémenter.
 
 ## 1. Objectif
@@ -257,7 +257,8 @@ Denis ouvre l'URL GitHub Pages sur son iPhone : fluidité, swipes, pavé, `?rese
 
 - `vite.config.js` : `base: '/'`.
 - `vercel.json` : preset Vite, sortie `dist/`, cache long sur `/models/`. Denis importe le repo dans Vercel (une fois) ; chaque push sur `main` construit et publie. Les tests ne tournent pas dans le pipeline Vercel : ils sont lancés localement avant chaque commit.
-- URL finale : celle du projet Vercel, choisie par Denis à l'import (le nom du projet devient le sous-domaine `*.vercel.app`) — c'est elle que porte le QR de la p.42.
+- URL finale : `https://nano-adventure.vercel.app/` — c'est elle que porte le QR de la p.42.
+- Icône : `public/favicon.svg` (planète cartoon + anneau doré) et `public/apple-touch-icon.png` (180 × 180, fond bleu nuit), référencées dans `index.html`.
 
 ## 12. Ordre de construction (jalons)
 
