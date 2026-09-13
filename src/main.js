@@ -7,6 +7,11 @@ import { stops, mystery } from './content.js';
 import { latLonToVec3 } from './lib/geo.js';
 import { createRoute } from './scene/route.js';
 import { initialState, WAIT } from './state.js';
+import { createCameraRig } from './scene/camera.js';
+import { loadPlane, createPlane } from './scene/plane.js';
+import { planePose, restPose } from './scene/planePose.js';
+import { createFlightRunner } from './app/flight.js';
+import { liftFor, angleBetween } from './lib/geo.js';
 
 const BASE = import.meta.env.BASE_URL;
 const canvas = document.getElementById('scene');
@@ -17,17 +22,16 @@ renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1026);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-camera.position.set(0, 0.6, 3.4);
-camera.lookAt(0, 0, 0);
 addLights(scene);
 scene.add(createStars());
 
+const rig = createCameraRig(camera);
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  rig.setViewport(w, h);
 }
+const liftOf = (a, b) => liftFor(angleBetween(a, b));
 window.addEventListener('resize', resize);
 resize();
 
@@ -43,6 +47,26 @@ globe.root.add(route.group);
 // Aperçu temporaire : tout le trajet visité + attente atteinte (retiré en Task 9)
 route.showFor({ ...initialState(), phase: 'LOCKED', stop: WAIT, visited: [0, 1, 2, 3, 4, 5, 6], waitReached: true }, 0);
 
+const plane = createPlane(await loadPlane(`${BASE}models/plane.glb`));
+globe.root.add(plane.object);
+plane.setPose(restPose(stopsVec[0], stopsVec[1]));
+const flights = createFlightRunner();
+const tmpWorld = new THREE.Vector3();
+const toWorldDir = (v) => { tmpWorld.set(v.x, v.y, v.z); globe.root.localToWorld(tmpWorld); return { x: tmpWorld.x, y: tmpWorld.y, z: tmpWorld.z }; };
+
+// Démo temporaire (retirée en Task 9) : touche N = vol vers l étape suivante
+let demoIdx = 0;
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'n' || flights.active() || demoIdx >= 6) return;
+  const from = stopsVec[demoIdx], to = stopsVec[demoIdx + 1];
+  rig.setMode('travel');
+  flights.start({
+    from, to,
+    onProgress: (e2) => { const p = planePose(from, to, e2, liftOf(from, to)); plane.setPose(p); rig.setDirection(toWorldDir(p.position)); },
+    onDone: () => { demoIdx++; plane.setPose(restPose(to, demoIdx < 6 ? stopsVec[demoIdx + 1] : waitVec)); },
+  });
+});
+
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
@@ -50,6 +74,9 @@ const debug = isDebug()
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (debug) debug.update(dt); else globe.root.rotation.y += 0.05 * dt;
+  flights.update(dt);
+  rig.update(dt);
+  if (debug) debug.update(dt);
+  else if (!flights.active() && demoIdx === 0) globe.root.rotation.y += 0.05 * dt;
   renderer.render(scene, camera);
 });
