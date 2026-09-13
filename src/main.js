@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { stops, mystery } from './content.js';
+import { stops, mystery, title, tagline, credits } from './content.js';
 import { latLonToVec3, liftFor, angleBetween } from './lib/geo.js';
 import { initialState, reduce, WAIT, FINAL, LAST_REAL } from './state.js';
 import { createStore } from './app/store.js';
@@ -22,9 +22,18 @@ import { createKeypad } from './ui/keypad.js';
 import { createQuestionMark, createBurst, createDestinationMarker } from './scene/effects.js';
 import { createTicket } from './ui/ticket.js';
 import { runUnlockSequence } from './app/unlock.js';
+import { createIntro } from './ui/intro.js';
 
 const BASE = import.meta.env.BASE_URL;
 const ui = document.getElementById('ui');
+
+function hasWebGL() {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+}
+if (!hasWebGL()) {
+  ui.innerHTML = '<div class="nowebgl">Ton navigateur ne peut pas afficher le globe — essaie avec Safari ou Chrome.</div>';
+  throw new Error('WebGL indisponible');
+}
 
 if (new URLSearchParams(location.search).has('reset')) { persist.reset(); location.replace(location.pathname); }
 // Déclaré tôt : utilisé par le « ? » (chargement) et par le coffre (état).
@@ -45,6 +54,7 @@ function resize() {
   rig.setViewport(w, h);
 }
 window.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize', resize);
 resize();
 addLights(scene);
 scene.add(createStars());
@@ -59,11 +69,27 @@ const nextVec = (i) => (i === WAIT ? finalVec : i === FINAL ? stopsVec[0] : i ==
 const liftOf = (a, b) => liftFor(angleBetween(a, b));
 const REST_ALT = { default: 1.13, wait: 1.16 };
 
+// ---------- état ----------
+const vault = createSecretVault({ url: `${BASE}secret.enc` });
+let secretReady = false;
+if (unlocked && persist.getSessionCode()) secretReady = (await vault.tryCode(persist.getSessionCode())).ok;
+const store = createStore(initialState({ unlocked, secretReady }), reduce);
+const dispatch = (type, extra = {}) => store.dispatch({ type, ...extra });
+const flights = createFlightRunner();
+let flightProgress = 0;
+
+// ---------- accueil ----------
+const intro = createIntro(ui, { title, tagline, credits, onStart: () => dispatch('START') });
+const progress = { globe: 0, plane: 0 };
+const report = () => intro.setProgress(progress.globe * 0.8 + progress.plane * 0.2);
+
 // ---------- chargement ----------
 const [globe, planeModel] = await Promise.all([
-  loadGlobe(`${BASE}models/earth.glb`),
-  loadPlane(`${BASE}models/plane.glb`),
+  loadGlobe(`${BASE}models/earth.glb`, (p) => { progress.globe = p; report(); }),
+  loadPlane(`${BASE}models/plane.glb`).then((m) => { progress.plane = 1; report(); return m; }),
 ]);
+
+// ---------- scène ----------
 scene.add(globe.root);
 const route = createRoute({ stopsVec, waitVec, finalVec });
 globe.root.add(route.group);
@@ -80,16 +106,8 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
-
-// ---------- état ----------
-const vault = createSecretVault({ url: `${BASE}secret.enc` });
-let secretReady = false;
-if (unlocked && persist.getSessionCode()) secretReady = (await vault.tryCode(persist.getSessionCode())).ok;
-const store = createStore(initialState({ unlocked, secretReady }), reduce);
-const flights = createFlightRunner();
 const tmp = new THREE.Vector3();
 const toWorldDir = (v) => { tmp.set(v.x, v.y, v.z); globe.root.localToWorld(tmp); return { x: tmp.x, y: tmp.y, z: tmp.z }; };
-let flightProgress = 0;
 
 function restAt(stop) {
   plane.setPose(restPose(vecOf(stop), nextVec(stop), stop === WAIT ? REST_ALT.wait : REST_ALT.default));
@@ -98,7 +116,7 @@ function restAt(stop) {
 function startFlight({ from, to, backwards }) {
   const a = vecOf(from), b = vecOf(to), lift = liftOf(a, b);
   flights.start({
-    from: a, to: b, backwards,
+    from: a, to: b, backwards, durationScale: reducedMotion ? 0.15 : 1,
     onProgress(e) {
       flightProgress = e;
       const p = planePose(a, b, e, lift);
@@ -110,7 +128,6 @@ function startFlight({ from, to, backwards }) {
 }
 
 // ---------- UI ----------
-const dispatch = (type, extra = {}) => store.dispatch({ type, ...extra });
 const timeline = createTimeline(ui, stops, { onSelect: (i) => dispatch('GOTO', { index: i }) });
 const stopCard = createStopCard(ui);
 const chevrons = createChevrons(ui, { onNext: () => dispatch('NEXT'), onPrev: () => dispatch('PREV') });
@@ -137,7 +154,7 @@ const keypad = createKeypad(ui, {
 const ticket = createTicket(ui, { onFlip: () => dispatch('FLIP_TICKET') });
 
 store.subscribe((state, prev) => {
-  if (prev.phase === 'INTRO') rig.setMode('travel');
+  if (prev.phase === 'INTRO') { rig.setMode('travel'); intro.hide(); }
   if (state.phase === 'FLYING' && prev.phase !== 'FLYING') { stopCard.hide(); startFlight(state.flight); }
   if (state.phase === 'AT_STOP' && prev.phase !== 'AT_STOP') { restAt(state.stop); stopCard.show(stops[state.stop]); }
   if (state.phase === 'LOCKED' && prev.phase !== 'LOCKED') {
@@ -171,15 +188,14 @@ store.subscribe((state, prev) => {
 timeline.render(store.get());
 chevrons.render(store.get());
 restAt(0);
-
-// Temporaire (l'écran d'accueil arrive en Task 12) : décollage immédiat.
-dispatch('START');
+rig.setDirection({ x: 0.2, y: 0.35, z: 1 }, true);   // vue d'ensemble, Europe/Afrique de face
+intro.setReady();
 
 // ---------- boucle ----------
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (store.get().phase === 'INTRO' && !debug) globe.root.rotation.y += 0.05 * dt;
+  if (store.get().phase === 'INTRO' && !debug && !reducedMotion) globe.root.rotation.y += 0.05 * dt;
   flights.update(dt);
   const st = store.get();
   qmark.update(dt, now / 1000);
