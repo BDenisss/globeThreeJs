@@ -6,7 +6,7 @@
 
 **Architecture:** Vite + JS vanilla. `src/state.js` (réducteur pur) et `src/lib/*` (géo, easing, crypto) ne touchent ni three.js ni le DOM et sont testés avec vitest. `src/scene/*` (globe, route, avion, caméra, effets) et `src/ui/*` (intro, cartes, timeline, pavé, billet) lisent l'état et se mettent à jour ; `src/app/*` (store, runner de vol, séquence de déverrouillage) orchestre ; `src/main.js` câble le tout.
 
-**Tech Stack:** Node 25 / npm 11 (local), Node 22 (CI), three 0.186.0, vite 8.3.0, vitest 5.0.0, GitHub Actions → GitHub Pages.
+**Tech Stack:** Node 25 / npm 11 (local), three 0.186.0, vite 8.3.0, vitest 5.0.0, Vercel (import du repo GitHub, build automatique à chaque push).
 
 **Spec:** `docs/superpowers/specs/2026-09-13-globe-voyage-design.md`
 
@@ -14,13 +14,13 @@
 
 - Repo : `C:\Users\bucsp\Documents\kdodenano\site` (clone de https://github.com/BDenisss/globeThreeJs, branche `main`). Tous les chemins ci-dessous sont relatifs à cette racine.
 - **Ne jamais pousser (`git push`) sans que Denis le demande** ; commits locaux à chaque tâche.
-- Vite `base: '/globeThreeJs/'` ; URL finale `https://bdenisss.github.io/globeThreeJs/`. Tous les fetchs d'assets passent par `import.meta.env.BASE_URL`.
+- Vite `base: '/'` (Vercel sert à la racine) ; URL finale = celle du projet Vercel (choisie par Denis à l'import, ex. `https://<projet>.vercel.app/`). Tous les fetchs d'assets passent par `import.meta.env.BASE_URL`.
 - Palette : noir `#141414`, or `#D9B65C`, crème `#F3EBD8`, fond de scène `#0B1026`. Polices : Anton (titres), Libre Baskerville (texte), via Google Fonts avec fallbacks `Impact, sans-serif` / `Georgia, serif`.
 - Étapes (dans cet ordre, indices 0–6) : Paris, Malaisie, Bali, Japon, Shanghai, Retour à Paris, Barcelone ; étape finale = indice 7 ; point d'attente = `'wait'`.
 - Le code en clair et le contenu de la révélation réel n'entrent **jamais** dans le repo : seuls `codeSalt`, `codeHash` (dans `src/content.js`) et `public/secret.enc` (chiffré) sont versionnés. Le secret de développement utilise le code `123456` et une destination factice (« QUELQUE PART »).
 - Crédits obligatoires (CC BY) : « Globe : Jacobs Development · Avion : Poly by Google — CC BY ».
 - Tests : `npm test` (vitest, environnement node) doit passer avant chaque commit.
-- Vérification visuelle : serveur Vite via `.claude/launch.json` (nom `dev`, port 5173), page `http://localhost:5173/globeThreeJs/`, émulation mobile 375 × 812 pour les captures.
+- Vérification visuelle : serveur Vite via `.claude/launch.json` à la racine de `kdodenano` (nom `dev`, port 5173, lance `npm --prefix site run dev`), page `http://localhost:5173/`, émulation mobile 375 × 812 pour les captures.
 - Commits : message en français, terminé par `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
 
 ---
@@ -31,7 +31,7 @@
 |---|---|
 | `index.html`, `src/styles.css` | Page unique, canvas + calque UI, tokens CSS, responsive |
 | `vite.config.js`, `vitest.config.js`, `package.json`, `.gitignore`, `.claude/launch.json` | Outillage |
-| `.github/workflows/pages.yml` | Test + build + déploiement Pages |
+| `vercel.json` | Preset Vite + cache long sur `/models/` |
 | `src/content.js` | Données éditées par Denis (étapes, indice, sel/hash, crédits) |
 | `src/lib/ease.js` | Easing, clamp, lerp |
 | `src/lib/geo.js` | lat/lon ↔ vecteur, slerp, arc, durée de vol |
@@ -66,13 +66,13 @@
 
 ---
 
-### Task 1 : Squelette Vite + déploiement GitHub Pages
+### Task 1 : Squelette Vite + déploiement (FAIT le 13/09 — hébergement basculé de GitHub Pages à Vercel après blocage Actions ; `base: '/'`, `vercel.json`, pas de workflow)
 
 **Files:**
 - Create: `package.json`, `vite.config.js`, `vitest.config.js`, `.gitignore`, `index.html`, `src/styles.css`, `src/main.js`, `.claude/launch.json`, `.github/workflows/pages.yml`, `test/smoke.test.js`
 
 **Interfaces:**
-- Produces: le script `npm run dev` (port 5173, base `/globeThreeJs/`), `npm run build` (→ `dist/`), `npm test` ; le canvas `#scene` et le conteneur `#ui` dans `index.html`.
+- Produces: le script `npm run dev` (port 5173, base `/`), `npm run build` (→ `dist/`), `npm test` ; le canvas `#scene` et le conteneur `#ui` dans `index.html`.
 
 - [ ] **Step 1 : Initialiser npm et installer les dépendances**
 
@@ -115,7 +115,7 @@ npm install -D vite@8.3.0 vitest@5.0.0
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/globeThreeJs/',
+  base: '/',
   server: { port: 5173, strictPort: true },
 });
 ```
@@ -275,9 +275,8 @@ jobs:
 
 - [ ] **Step 7 : Vérifier build et dev**
 
-Run : `npm run build` — Expected : `dist/index.html` existe et contient `/globeThreeJs/assets/`.
-Vérifier : `grep -c "/globeThreeJs/assets/" dist/index.html` → `≥ 1`.
-Puis démarrer le serveur via l'outil de preview (`preview_start` avec `name: "dev"`), naviguer vers `http://localhost:5173/globeThreeJs/`, capture : un cube coloré tourne sur fond bleu nuit.
+Run : `npm run build` — Expected : `dist/index.html` existe et contient `/assets/`.
+Puis démarrer le serveur via l'outil de preview (`preview_start` avec `name: "dev"`), naviguer vers `http://localhost:5173/`, capture : un cube coloré tourne sur fond bleu nuit.
 
 - [ ] **Step 8 : Commit**
 
@@ -1251,7 +1250,7 @@ renderer.setAnimationLoop((now) => {
 
 - [ ] **Step 7 : Vérification visuelle**
 
-Serveur `dev` démarré, ouvrir `http://localhost:5173/globeThreeJs/`, attendre 3 s, capture. Expected : globe cartoon centré, entier, tournant lentement, éclairé (continents verts/bruns lisibles, océan bleu), étoiles discrètes ; console : `relief max 1.0xx` (entre 1.02 et 1.12). Si le globe est décentré ou coupé : `fitSphere` a échoué → vérifier `collectWorldPositions` (il faut `updateMatrixWorld(true)` avant lecture).
+Serveur `dev` démarré, ouvrir `http://localhost:5173/`, attendre 3 s, capture. Expected : globe cartoon centré, entier, tournant lentement, éclairé (continents verts/bruns lisibles, océan bleu), étoiles discrètes ; console : `relief max 1.0xx` (entre 1.02 et 1.12). Si le globe est décentré ou coupé : `fitSphere` a échoué → vérifier `collectWorldPositions` (il faut `updateMatrixWorld(true)` avant lecture).
 
 - [ ] **Step 8 : Commit**
 
@@ -1340,7 +1339,7 @@ if (debug) debug.update(dt); else globe.root.rotation.y += 0.05 * dt;
 
 - [ ] **Step 3 : Calibrer**
 
-Ouvrir `http://localhost:5173/globeThreeJs/?debug`. Le globe est immobile, les marqueurs rouges sont aux positions géographiques du **repère**, pas du modèle : il faut tourner le modèle (`__calib`) jusqu'à ce que chaque marqueur touche la bonne ville. Méthode :
+Ouvrir `http://localhost:5173/?debug`. Le globe est immobile, les marqueurs rouges sont aux positions géographiques du **repère**, pas du modèle : il faut tourner le modèle (`__calib`) jusqu'à ce que chaque marqueur touche la bonne ville. Méthode :
 1. Capture. Repérer l'Afrique/l'Europe sur le modèle et le marqueur `paris` (près de l'axe Z bleu, vers le haut).
 2. Essayer successivement via l'outil JavaScript du navigateur : `window.__calib(0,0,0)`, `(90,0,0)`, `(180,0,0)`, `(-90,0,0)`, puis avec `pitch` ±90 si les pôles ne sont pas sur l'axe Y (capture après chacun). L'export FBX → glTF impose souvent un `pitch` de ±90 ou un `yaw` de 180.
 3. Affiner par pas de 1–5° jusqu'à ce que `paris` soit sur Paris, `japon` sur Tokyo, `bali` sur Bali (trois points non alignés ⇒ orientation unique). Tolérance : le marqueur (rayon 0,018 ≈ 115 km) recouvre la ville.
@@ -2906,14 +2905,14 @@ Le script demande le contenu du billet, le message du verso et le code (masqué)
 
 ## Développer
 ```bash
-npm run dev      # http://localhost:5173/globeThreeJs/
+npm run dev      # http://localhost:5173/
 npm test         # tests unitaires
 npm run build    # dossier dist/
 ```
 `?debug` dans l'URL : marqueurs rouges sur les villes + rotation libre à la souris. `?reset` : efface le déverrouillage mémorisé.
 
 ## Déployer
-Push sur `main` → GitHub Actions construit et publie sur GitHub Pages. À faire une fois : *Settings → Pages → Source : GitHub Actions*. URL : https://bdenisss.github.io/globeThreeJs/
+Le repo est importé dans Vercel (preset Vite, sortie `dist/`) : chaque push sur `main` déclenche un build et une mise en ligne. L'URL est celle du projet Vercel.
 
 ## Crédits
 Globe : « Low Poly Planet Earth » par Jacobs Development (CC BY 4.0). Avion : « Airplane » par Poly by Google (CC BY 3.0).
@@ -2941,4 +2940,4 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - Denis télécharge l'avion (Poly Pizza, glTF) → `public/models/plane.glb` ; vérifier le sens du nez (`GLB_YAW`) et la taille.
 - Denis renseigne `content.js` (dates, ville du Japon, indice) puis `npm run seal` avec le vrai code et le vrai billet.
-- Denis active GitHub Pages (Source : GitHub Actions) et pousse ; test réel sur iPhone.
+- Denis pousse ; Vercel publie ; test réel sur iPhone.

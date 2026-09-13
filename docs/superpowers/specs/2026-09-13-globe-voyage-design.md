@@ -1,7 +1,7 @@
 # Le voyage de Nano — site secret 3D (spec de conception)
 
 Date : 13 septembre 2026
-Repo : https://github.com/BDenisss/globeThreeJs (déployé sur GitHub Pages)
+Repo : https://github.com/BDenisss/globeThreeJs (déployé sur Vercel — GitHub Pages abandonné le 13/09 : le compte GitHub bloque toute exécution d'Actions)
 Statut : design validé section par section en conversation, à implémenter.
 
 ## 1. Objectif
@@ -24,7 +24,7 @@ Le site est **le moment de la révélation** : rien dans le magazine ne dit « L
 | Contenu par étape | Nom du lieu + sous-titre optionnel + dates. Rien d'autre |
 | Mot de passe | Code **chiffré**, longueur configurable (défaut 6), pavé numérique |
 | Révélation | Billet Eurostar recto (LONDRES, 2–4 OCT 2026) + verso (message de Denis), retournable d'un tap |
-| Hébergement | GitHub Pages depuis le repo, déploiement automatique par GitHub Actions, `base: '/globeThreeJs/'` |
+| Hébergement | Vercel, repo GitHub importé, build automatique à chaque push sur `main`, `base: '/'` |
 | Crédits | Une ligne discrète sur l'écran d'accueil : « Globe : Jacobs Development · Avion : Poly by Google — CC BY » |
 
 ## 3. Architecture
@@ -32,7 +32,7 @@ Le site est **le moment de la révélation** : rien dans le magazine ne dit « L
 ```
 site/
   index.html                  page unique : <canvas> + couches UI HTML/CSS
-  vite.config.js              base '/globeThreeJs/'
+  vite.config.js              base '/'
   package.json                scripts : dev, build, preview, test, seal
   public/
     models/earth.glb          globe
@@ -63,7 +63,7 @@ site/
     seal.mjs                  Node : code + contenu clair → hash + secret.enc
   test/                       vitest : geo, state, crypto (via scripts/seal + lib/crypto)
   docs/superpowers/specs/     cette spec
-  .github/workflows/pages.yml build + déploiement
+  vercel.json                 preset Vite, cache des modèles
 ```
 
 Dépendances : `three` (runtime), `vite`, `vitest` (dev). Rien d'autre.
@@ -255,13 +255,13 @@ Denis ouvre l'URL GitHub Pages sur son iPhone : fluidité, swipes, pavé, `?rese
 
 ## 11. Déploiement
 
-- `vite.config.js` : `base: '/globeThreeJs/'`.
-- `.github/workflows/pages.yml` : sur push `main` → `npm ci` → `npm test` → `npm run build` → `actions/upload-pages-artifact` (`dist/`) → `actions/deploy-pages`. Denis active « GitHub Pages → Source : GitHub Actions » une fois dans les réglages du repo.
-- URL finale : `https://bdenisss.github.io/globeThreeJs/` — c'est elle que porte le QR de la p.42.
+- `vite.config.js` : `base: '/'`.
+- `vercel.json` : preset Vite, sortie `dist/`, cache long sur `/models/`. Denis importe le repo dans Vercel (une fois) ; chaque push sur `main` construit et publie. Les tests ne tournent pas dans le pipeline Vercel : ils sont lancés localement avant chaque commit.
+- URL finale : celle du projet Vercel, choisie par Denis à l'import (le nom du projet devient le sous-domaine `*.vercel.app`) — c'est elle que porte le QR de la p.42.
 
 ## 12. Ordre de construction (jalons)
 
-1. **Squelette + déploiement** : Vite, `index.html`, canvas avec un cube, workflow Pages → URL vivante.
+1. **Squelette + déploiement** : Vite, `index.html`, canvas avec un cube, import Vercel → URL vivante.
 2. **Globe** : chargement, recentrage, normalisation, éclairage, étoiles, mode `?debug` et calibration validée (marqueurs sur les 8 villes au bon endroit).
 3. **Géo + route** : `lib/geo.js` testé, pointillé doré entre toutes les étapes.
 4. **Avion + caméra** : vol animé le long d'un arc, caméra qui suit, inclinaison.

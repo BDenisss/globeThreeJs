@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/globeThreeJs/',
+  base: '/',
   server: { port: 5173, strictPort: true },
 });
