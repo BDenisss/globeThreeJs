@@ -19,7 +19,9 @@ import { persist } from './lib/persist.js';
 import { createSecretVault } from './app/secret.js';
 import { createLockCard } from './ui/lockCard.js';
 import { createKeypad } from './ui/keypad.js';
-import { createQuestionMark } from './scene/effects.js';
+import { createQuestionMark, createBurst, createDestinationMarker } from './scene/effects.js';
+import { createTicket } from './ui/ticket.js';
+import { runUnlockSequence } from './app/unlock.js';
 
 const BASE = import.meta.env.BASE_URL;
 const ui = document.getElementById('ui');
@@ -70,6 +72,11 @@ globe.root.add(plane.object);
 const qmark = createQuestionMark(waitVec);
 globe.root.add(qmark.object);
 if (unlocked) qmark.hide();
+const marker = createDestinationMarker(finalVec);
+globe.root.add(marker.object);
+if (unlocked) marker.show();
+const bursts = [];
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
@@ -127,6 +134,7 @@ const keypad = createKeypad(ui, {
     }
   },
 });
+const ticket = createTicket(ui, { onFlip: () => dispatch('FLIP_TICKET') });
 
 store.subscribe((state, prev) => {
   if (prev.phase === 'INTRO') rig.setMode('travel');
@@ -139,6 +147,24 @@ store.subscribe((state, prev) => {
   if (state.phase !== 'LOCKED' && prev.phase === 'LOCKED') lockCard.hide();
   if (state.lockOpen && !prev.lockOpen) keypad.open();
   if (!state.lockOpen && prev.lockOpen) keypad.close();
+  if (state.phase === 'UNLOCKING' && prev.phase !== 'UNLOCKING') {
+    runUnlockSequence({
+      qmark, lockCard, flights, plane, rig, toWorldDir, waitVec, finalVec, liftOf, reducedMotion,
+      onProgress: (e) => { flightProgress = e; },
+      onArrive: () => {
+        if (!reducedMotion) { const b = createBurst(finalVec); globe.root.add(b.object); bursts.push(b); }
+        marker.show();
+      },
+      onLanded: () => dispatch('LANDED'),
+    });
+  }
+  if (state.phase === 'REVEALED' && prev.phase !== 'REVEALED') {
+    restAt(FINAL);
+    marker.show();
+    ticket.show(vault.get(), state.ticketFlipped);
+  }
+  if (state.phase !== 'REVEALED' && prev.phase === 'REVEALED') ticket.hide();
+  if (state.ticketFlipped !== prev.ticketFlipped) ticket.setFlipped(state.ticketFlipped);
   timeline.render(state);
   chevrons.render(state);
 });
@@ -157,6 +183,9 @@ renderer.setAnimationLoop((now) => {
   flights.update(dt);
   const st = store.get();
   qmark.update(dt, now / 1000);
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    if (bursts[i].update(dt)) { globe.root.remove(bursts[i].object); bursts.splice(i, 1); }
+  }
   if (st.phase === 'LOCKED' && st.stop === WAIT) plane.hover(now / 1000);
   route.showFor(st, flightProgress);
   if (debug) debug.update(dt); else rig.update(dt);
