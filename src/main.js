@@ -114,6 +114,7 @@ const keypad = createKeypad(ui, {
   onClose: () => dispatch('CLOSE_LOCK'),
   async onSubmit(code) {
     const r = await vault.tryCode(code);
+    if (!store.get().lockOpen) return; // pavé fermé pendant le déchiffrement : résultat ignoré, rien à persister
     if (r.ok) {
       persist.setUnlocked(); persist.setSessionCode(code);
       keypad.success();
