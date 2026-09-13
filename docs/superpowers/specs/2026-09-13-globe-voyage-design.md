@@ -76,13 +76,13 @@ Principe : **`state.js` et `lib/*` ne dépendent pas de three.js ni du DOM** ; i
 
 - Chargé via `GLTFLoader`. Le fichier a un décalage d'origine hérité de l'export FBX (nœud « Object » translaté de ~(−0,05 ; 1,25 ; 0,07)) : au chargement, on calcule la `Box3` du mesh, on **recentre** le modèle sur son centre et on **normalise** pour que le rayon de la sphère de base soit exactement 1 (unité de la scène). Les continents extrudés dépassent légèrement (≈ 1,05).
 - **Calibration** : la correspondance lat/lon → point 3D suppose une sphère « Y vers le haut, méridien 0 sur +Z ». L'asset n'est pas garanti aligné. `globe.js` applique une rotation de correction fixe `CALIB = { yaw, pitch, roll }` (constantes dans `globe.js`, déterminées une fois). Le mode `?debug` dans l'URL affiche un marqueur rouge sur chaque étape et une aide au clavier (`Q/E` yaw, `W/S` pitch, `A/D` roll, `P` imprime les valeurs en console) pour trouver `CALIB`.
-- Rotation d'attente : le globe (et tout ce qui est attaché : route, marqueurs) tourne de 0,02 rad/s autour de Y quand l'état est `AT_STOP` ou `INTRO` et que l'utilisateur n'interagit pas ; pas de rotation pendant un vol (la caméra fait le travail).
+- Rotation d'attente : le globe (et tout ce qui est attaché : route, marqueurs) tourne de 0,05 rad/s autour de Y **uniquement pendant `INTRO`**. Aux étapes, le globe est immobile : la caméra fixe garde l'étape courante centrée (une rotation ferait dériver la ville hors champ en moins d'une minute).
 
 ### 4.2 Conversion géographique (`lib/geo.js`)
 
 - `latLonToVec3(lat, lon, r)` → `{x, y, z}` : `x = r cos(lat) sin(lon)`, `y = r sin(lat)`, `z = r cos(lat) cos(lon)` (angles en radians).
 - `slerp(a, b, t)` : interpolation sphérique entre deux vecteurs unitaires (arc de grand cercle).
-- `arcPoint(a, b, t, lift)` : point sur l'arc à `t ∈ [0,1]`, altitude `1 + lift · sin(π t)` — l'avion monte puis redescend ; `lift` dépend de la longueur de l'arc (`0.08 + 0.25 · angle/π`, borné à 0,35).
+- `arcPoint(a, b, t, lift, base = 1)` : point sur l'arc à `t ∈ [0,1]`, altitude `base + lift · sin(π t)` — l'avion monte puis redescend (base 1,07 pour l'avion) ; `lift` dépend de la longueur de l'arc (`0.08 + 0.3 · angle/π`, borné à 0,35).
 - `arcLength(a, b)` : angle entre les deux vecteurs (pour proportionner la durée du vol).
 
 ### 4.3 Route (`scene/route.js`)
@@ -95,12 +95,12 @@ Principe : **`state.js` et `lib/*` ne dépendent pas de three.js ni du DOM** ; i
 
 - glTF low-poly, mis à l'échelle pour une envergure ≈ 0,12 unité ; matériaux de l'asset conservés, avec une légère teinte dorée sur le fuselage si l'asset est blanc (paramètre).
 - Posé à une étape : à l'altitude 1,07 au-dessus du point, nez orienté vers la prochaine étape.
-- En vol : position = `arcPoint(a, b, ease(t), lift)` ; orientation = `lookAt(position suivante)` avec « up » = normale au globe ; **inclinaison** (roll) proportionnelle à la variation de cap, bornée à 25°. Durée = `1.2 s + 2.6 s · angle/π` (Paris → Malaisie ≈ 2,5 s, Shanghai → Paris ≈ 2,4 s, Paris → Barcelone ≈ 1,3 s). Retour arrière : même arc à l'envers, durée × 0,6.
+- En vol : position = `arcPoint(a, b, ease(t), lift)` ; orientation = `lookAt(position suivante)` avec « up » = normale au globe ; **inclinaison** (roll) = `15° · sin(π t)` — nulle au décollage et à l'atterrissage, maximale à mi-vol (sur un grand cercle il n'y a pas de virage réel ; l'inclinaison est un effet de style, stable et indépendant de la cadence d'images). Durée = `1.2 s + 2.6 s · angle/π` (Paris → Malaisie ≈ 2,5 s, Shanghai → Paris ≈ 2,4 s, Paris → Barcelone ≈ 1,3 s). Retour arrière : même arc à l'envers, durée × 0,6.
 - Point d'attente (état `LOCKED`) : l'avion flotte (oscillation verticale ±0,01, période 2 s) devant le « ? ».
 
 ### 4.5 Point d'attente et « ? »
 
-Pour ne pas trahir la destination, le point d'attente n'est **pas** sur la trajectoire Barcelone → Londres. Il est au large dans l'Atlantique : `lat 45, lon −12`. Un « ? » doré (sprite texte ou géométrie extrudée `TextGeometry`, taille 0,15) flotte à l'altitude 1,25 au-dessus de ce point, tournant lentement sur lui-même. Il se dissout (opacité → 0 en 0,6 s) au déverrouillage.
+Pour ne pas trahir la destination, le point d'attente n'est **pas** sur la trajectoire Barcelone → Londres. Il est au large dans l'Atlantique : `lat 45, lon −12`. Un « ? » doré (sprite dessiné sur canvas, taille 0,16) flotte à l'altitude 1,25 au-dessus de ce point et pulse doucement (±6 % de taille). Il est visible dès le début du parcours (teaser), sauf si le site est déjà déverrouillé. Il se dissout (opacité → 0 en 0,6 s) au déverrouillage. L'avion, lui, flotte à l'altitude 1,1 sous le « ? ».
 
 ### 4.6 Caméra (`scene/camera.js`)
 
