@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { loadGlobe } from './scene/globe.js';
 import { addLights } from './scene/lights.js';
 import { createStars } from './scene/stars.js';
+import { setupDebug, isDebug } from './scene/debug.js';
+import { stops, mystery } from './content.js';
 
 const BASE = import.meta.env.BASE_URL;
 const canvas = document.getElementById('scene');
@@ -30,9 +32,13 @@ const globe = await loadGlobe(`${BASE}models/earth.glb`, (p) => console.log('glo
 scene.add(globe.root);
 console.log('relief max', globe.reliefRadius.toFixed(3));
 
+const debug = isDebug()
+  ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
+  : null;
+
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  globe.root.rotation.y += 0.05 * dt;
+  if (debug) debug.update(dt); else globe.root.rotation.y += 0.05 * dt;
   renderer.render(scene, camera);
 });

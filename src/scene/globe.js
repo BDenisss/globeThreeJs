@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { fitSphere } from './globeFit.js';
 
 // Rotation de correction du modèle (radians), réglée une fois en mode ?debug (Task 6).
-export const CALIB = { yaw: 0, pitch: 0, roll: 0 };
+export const CALIB = { yaw: 88 * Math.PI / 180, pitch: 6 * Math.PI / 180, roll: -9.5 * Math.PI / 180 };
 
 export function loadGlobe(url, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
