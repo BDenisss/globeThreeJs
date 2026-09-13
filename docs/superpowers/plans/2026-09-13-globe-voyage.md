@@ -18,6 +18,7 @@
 - Palette : noir `#141414`, or `#D9B65C`, crème `#F3EBD8`, fond de scène `#0B1026`. Polices : Anton (titres), Libre Baskerville (texte), via Google Fonts avec fallbacks `Impact, sans-serif` / `Georgia, serif`.
 - Étapes (dans cet ordre, indices 0–6) : Paris, Malaisie, Bali, Japon, Shanghai, Retour à Paris, Barcelone ; étape finale = indice 7 ; point d'attente = `'wait'`.
 - Le code en clair et le contenu de la révélation réel n'entrent **jamais** dans le repo : seul `public/secret.enc` (chiffré) est versionné ; aucun hash du code n'est publié (ruling tâche 4 : la vérification du code = succès du déchiffrement AES-GCM). Le secret de développement utilise le code `123456` et une destination factice (« QUELQUE PART »).
+- **Altitudes (mesurées sur le modèle, ruling tâche 5)** : plateau des continents ≈ 1,066, p99 = 1,112, max = 1,136 (rayon mer = 1). Route à 1,10 ; avion posé/base de vol 1,13 ; marqueurs debug 1,12 ; avion en attente 1,16 ; « ? » à 1,30 ; particules 1,14 ; marqueur Big Ben 1,16.
 - Crédits obligatoires (CC BY) : « Globe : Jacobs Development · Avion : Poly by Google — CC BY ».
 - Tests : `npm test` (vitest, environnement node) doit passer avant chaque commit.
 - Vérification visuelle : serveur Vite via `.claude/launch.json` à la racine de `kdodenano` (nom `dev`, port 5173, lance `npm --prefix site run dev`), page `http://localhost:5173/`, émulation mobile 375 × 812 pour les captures.
@@ -1250,7 +1251,7 @@ renderer.setAnimationLoop((now) => {
 
 - [ ] **Step 7 : Vérification visuelle**
 
-Serveur `dev` démarré, ouvrir `http://localhost:5173/`, attendre 3 s, capture. Expected : globe cartoon centré, entier, tournant lentement, éclairé (continents verts/bruns lisibles, océan bleu), étoiles discrètes ; console : `relief max 1.0xx` (entre 1.02 et 1.12). Si le globe est décentré ou coupé : `fitSphere` a échoué → vérifier `collectWorldPositions` (il faut `updateMatrixWorld(true)` avant lecture).
+Serveur `dev` démarré, ouvrir `http://localhost:5173/`, attendre 3 s, capture. Expected : globe cartoon centré, entier, tournant lentement, éclairé (continents verts/bruns lisibles, océan bleu), étoiles discrètes ; console : `relief max 1.136` (sommet le plus haut ; le plateau des continents est à ≈ 1,066). Si le globe est décentré ou coupé : `fitSphere` a échoué → vérifier `collectWorldPositions` (il faut `updateMatrixWorld(true)` avant lecture).
 
 - [ ] **Step 8 : Commit**
 
@@ -1283,13 +1284,13 @@ import { CALIB } from './globe.js';
 
 export const isDebug = () => new URLSearchParams(location.search).has('debug');
 
-// points : [{ name, lat, lon }] — un marqueur rouge par point, à l'altitude 1.08.
+// points : [{ name, lat, lon }] — un marqueur rouge par point, à l'altitude 1.12 (au-dessus des continents).
 export function setupDebug({ globe, camera, renderer, points }) {
   const mat = new THREE.MeshBasicMaterial({ color: 0xff2020 });
   const geo = new THREE.SphereGeometry(0.018, 12, 12);
   for (const p of points) {
     const m = new THREE.Mesh(geo, mat);
-    const v = latLonToVec3(p.lat, p.lon, 1.08);
+    const v = latLonToVec3(p.lat, p.lon, 1.12);
     m.position.set(v.x, v.y, v.z);
     m.name = `dbg:${p.name}`;
     globe.root.add(m);
@@ -1342,7 +1343,7 @@ if (debug) debug.update(dt); else globe.root.rotation.y += 0.05 * dt;
 Ouvrir `http://localhost:5173/?debug`. Le globe est immobile, les marqueurs rouges sont aux positions géographiques du **repère**, pas du modèle : il faut tourner le modèle (`__calib`) jusqu'à ce que chaque marqueur touche la bonne ville. Méthode :
 1. Capture. Repérer l'Afrique/l'Europe sur le modèle et le marqueur `paris` (près de l'axe Z bleu, vers le haut).
 2. Essayer successivement via l'outil JavaScript du navigateur : `window.__calib(0,0,0)`, `(90,0,0)`, `(180,0,0)`, `(-90,0,0)`, puis avec `pitch` ±90 si les pôles ne sont pas sur l'axe Y (capture après chacun). L'export FBX → glTF impose souvent un `pitch` de ±90 ou un `yaw` de 180.
-3. Affiner par pas de 1–5° jusqu'à ce que `paris` soit sur Paris, `japon` sur Tokyo, `bali` sur Bali (trois points non alignés ⇒ orientation unique). Tolérance : le marqueur (rayon 0,018 ≈ 115 km) recouvre la ville.
+3. Affiner par pas de 1–5° jusqu'à ce que `paris` soit sur Paris, `japon` sur Tokyo, `bali` sur Bali (trois points non alignés ⇒ orientation unique). Tolérance : le marqueur (rayon 0,018 ≈ 115 km) recouvre la ville. Les marqueurs flottent à 1,12 : légèrement au-dessus des continents (plateau ≈ 1,066), c'est voulu.
 4. Lire `window.__calibGet()` et reporter dans `src/scene/globe.js` :
 ```js
 export const CALIB = { yaw: <yawDeg> * Math.PI / 180, pitch: <pitchDeg> * Math.PI / 180, roll: <rollDeg> * Math.PI / 180 };
@@ -1472,7 +1473,7 @@ import { SEGMENT_KEYS, segmentProgress } from './routeLogic.js';
 const GOLD = 0xd9b65c;
 
 // Pointillé le long de l'arc a→b (vecteurs unitaires), tirets = petites boîtes instanciées.
-export function createDashedArc(a, b, { altitude = 1.06, dash = 0.018, gap = 0.014, thickness = 0.006, color = GOLD } = {}) {
+export function createDashedArc(a, b, { altitude = 1.10, dash = 0.018, gap = 0.014, thickness = 0.006, color = GOLD } = {}) {
   const arcLen = angleBetween(a, b) * altitude;
   const total = Math.max(1, Math.floor(arcLen / (dash + gap)));
   const geo = new THREE.BoxGeometry(thickness, thickness, dash);
@@ -1535,7 +1536,7 @@ route.showFor({ ...initialState(), phase: 'LOCKED', stop: WAIT, visited: [0, 1, 
 
 - [ ] **Step 7 : Vérification visuelle**
 
-Ouvrir `?debug`, capture face Europe puis face Asie (tourner avec la souris : `left_click_drag`). Expected : pointillés dorés fins reliant Paris → KL → Bali → Tokyo → Shanghai → Paris → Barcelone → point d'attente Atlantique, posés juste au-dessus du relief, sans traverser le globe (si un arc long « coupe » le globe, augmenter `altitude` à 1.07). Aucun segment vers Londres.
+Ouvrir `?debug`, capture face Europe puis face Asie (tourner avec la souris : `left_click_drag`). Expected : pointillés dorés fins reliant Paris → KL → Bali → Tokyo → Shanghai → Paris → Barcelone → point d'attente Atlantique, posés juste au-dessus des continents (plateau ≈ 1,066 ; l'altitude 1,10 passe au-dessus de 98 % des sommets, seuls quelques pics à 1,11–1,136 peuvent effleurer un tiret — acceptable), sans traverser le globe (si un arc long « coupe » visiblement le globe, augmenter `altitude` à 1.12). Aucun segment vers Londres.
 
 - [ ] **Step 8 : Commit**
 
@@ -1555,7 +1556,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `src/main.js`
 
 **Interfaces:**
-- Produces: `planePose(a, b, e, lift, base=1.07) → { position, target, up, roll }` et `restPose(at, headingTo, altitude=1.07)` (purs) ; `loadPlane(url) → Promise<THREE.Object3D>` (glb ou fallback procédural, nez vers +Z, envergure 0,12) ; `createPlane(model) → { object, setPose(pose) }` ; `createCameraRig(camera) → { setViewport(w,h), setMode('intro'|'travel'), setDirection(v, immediate=false), update(dt) }` ; `createFlightRunner() → { start({from, to, backwards, durationScale, onProgress(e, pos, flight), onDone}), active(), update(dt) }`.
+- Produces: `planePose(a, b, e, lift, base=1.13) → { position, target, up, roll }` et `restPose(at, headingTo, altitude=1.13)` (purs) ; `loadPlane(url) → Promise<THREE.Object3D>` (glb ou fallback procédural, nez vers +Z, envergure 0,12) ; `createPlane(model) → { object, setPose(pose) }` ; `createCameraRig(camera) → { setViewport(w,h), setMode('intro'|'travel'), setDirection(v, immediate=false), update(dt) }` ; `createFlightRunner() → { start({from, to, backwards, durationScale, onProgress(e, pos, flight), onDone}), active(), update(dt) }`.
 - Consumes: `arcPoint/liftFor/flightDuration/slerp/…` (Task 2), `easeInOutCubic` (Task 2).
 
 - [ ] **Step 1 : Tests**
@@ -1571,7 +1572,7 @@ const a = latLonToVec3(48.86, 2.35), b = latLonToVec3(35.68, 139.65);
 describe('planePose', () => {
   it('position à base+lift au milieu, cible devant, up radial', () => {
     const p = planePose(a, b, 0.5, 0.2);
-    expect(Math.abs(length(p.position) - 1.27)).toBeLessThan(1e-6);
+    expect(Math.abs(length(p.position) - 1.33)).toBeLessThan(1e-6);
     expect(Math.abs(length(p.up) - 1)).toBeLessThan(1e-6);
     expect(dot(normalize(p.position), p.up)).toBeGreaterThan(0.999);
     const ahead = sub(p.target, p.position);
@@ -1581,15 +1582,15 @@ describe('planePose', () => {
   it('à e=1 la cible reste devant (pas de dégénérescence)', () => {
     const p = planePose(a, b, 1, 0.2);
     expect(length(sub(p.target, p.position))).toBeGreaterThan(0);
-    expect(Math.abs(length(p.position) - 1.07)).toBeLessThan(1e-6);
+    expect(Math.abs(length(p.position) - 1.13)).toBeLessThan(1e-6);
   });
   it('roll nul aux extrémités, max au milieu', () => {
     expect(planePose(a, b, 0, 0.2).roll).toBeCloseTo(0, 6);
     expect(planePose(a, b, 0.5, 0.2).roll).toBeCloseTo(15 * Math.PI / 180, 6);
   });
   it('restPose pose à l altitude demandée, orienté vers la prochaine étape', () => {
-    const r = restPose(a, b, 1.07);
-    expect(Math.abs(length(r.position) - 1.07)).toBeLessThan(1e-6);
+    const r = restPose(a, b, 1.13);
+    expect(Math.abs(length(r.position) - 1.13)).toBeLessThan(1e-6);
     expect(dot(normalize(sub(r.target, r.position)), normalize(sub(b, a)))).toBeGreaterThan(0);
   });
 });
@@ -1638,7 +1639,7 @@ const BANK_MAX = 15 * Math.PI / 180;
 const EPS = 0.01;
 
 // Pose de l'avion en vol : a, b unitaires, e ∈ [0,1] (déjà easé).
-export function planePose(a, b, e, lift, base = 1.07) {
+export function planePose(a, b, e, lift, base = 1.13) {
   const position = arcPoint(a, b, e, lift, base);
   let dir;
   if (e < 1 - EPS) dir = sub(arcPoint(a, b, e + EPS, lift, base), position);
@@ -1647,7 +1648,7 @@ export function planePose(a, b, e, lift, base = 1.07) {
 }
 
 // Avion posé en `at`, nez vers `headingTo` (tangent). Si headingTo == at, cap arbitraire (est).
-export function restPose(at, headingTo, altitude = 1.07) {
+export function restPose(at, headingTo, altitude = 1.13) {
   const position = scale(normalize(at), altitude);
   const next = scale(slerp(at, headingTo, 0.02), altitude);
   let dir = sub(next, position);
@@ -1831,7 +1832,7 @@ Dans la boucle, avant `renderer.render` : `flights.update(dt); rig.update(dt);` 
 
 - [ ] **Step 7 : Vérification visuelle**
 
-Sans `?debug` : capture initiale (avion posé à Paris, minuscule mais visible, doré si procédural). Appuyer `n` (outil clavier), captures à ~0,8 s et ~1,6 s : l'avion suit un arc bombé vers KL, nez dans le sens du vol, la caméra suit et le garde centré ; à l'arrivée il se pose orienté vers Bali. Si l'avion vole « à l'envers » (queue devant) avec le glb : ajuster `GLB_YAW` à `Math.PI`. Si l'avion est enfoncé dans le relief : `reliefRadius` (Task 5) > 1.07 → passer `base` de `planePose` et l'altitude de la route au-dessus de cette valeur.
+Sans `?debug` : capture initiale (avion posé à Paris, minuscule mais visible, doré si procédural). Appuyer `n` (outil clavier), captures à ~0,8 s et ~1,6 s : l'avion suit un arc bombé vers KL, nez dans le sens du vol, la caméra suit et le garde centré ; à l'arrivée il se pose orienté vers Bali. Si l'avion vole « à l'envers » (queue devant) avec le glb : ajuster `GLB_YAW` à `Math.PI`. L'avion est posé à 1,13 (au-dessus du plateau des continents ≈ 1,066 et de 99 % des sommets) : s'il paraît « flotter » trop haut à une étape, ne pas descendre sous 1,11.
 
 - [ ] **Step 8 : Commit**
 
@@ -2113,7 +2114,7 @@ const vecOf = (i) => (i === WAIT ? waitVec : i === FINAL ? finalVec : stopsVec[i
 // Direction du nez de l'avion posé : la prochaine étape (à Londres : vers Paris, jamais vers lui-même).
 const nextVec = (i) => (i === WAIT ? finalVec : i === FINAL ? stopsVec[0] : i === LAST_REAL ? waitVec : stopsVec[i + 1]);
 const liftOf = (a, b) => liftFor(angleBetween(a, b));
-const REST_ALT = { default: 1.07, wait: 1.1 };
+const REST_ALT = { default: 1.13, wait: 1.16 };
 
 // ---------- chargement ----------
 const [globe, planeModel] = await Promise.all([
@@ -2215,7 +2216,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `src/scene/plane.js` (ajout `hover`), `src/main.js`, `src/styles.css`
 
 **Interfaces:**
-- Produces: `createSecretVault({ url, fetchImpl? }) → { ready(): Promise, get(): object|null, tryCode(code): Promise<{ok, secret?, missing?}> }` (`missing: true` si `secret.enc` est absent/illisible ; sinon `ok:false` = mauvais code) ; `createLockCard(root, { onOpen }) → { show({ hint }), hide() }` ; `createKeypad(root, { length, onSubmit(code), onClose }) → { open(), close(), shake(message), success() }` ; `createQuestionMark(dirVec, altitude=1.25, size=0.16) → { object, update(dt, t), fadeOut(seconds), hide() }` ; `plane.hover(t)` (oscillation autour de la dernière pose).
+- Produces: `createSecretVault({ url, fetchImpl? }) → { ready(): Promise, get(): object|null, tryCode(code): Promise<{ok, secret?, missing?}> }` (`missing: true` si `secret.enc` est absent/illisible ; sinon `ok:false` = mauvais code) ; `createLockCard(root, { onOpen }) → { show({ hint }), hide() }` ; `createKeypad(root, { length, onSubmit(code), onClose }) → { open(), close(), shake(message), success() }` ; `createQuestionMark(dirVec, altitude=1.30, size=0.16) → { object, update(dt, t), fadeOut(seconds), hide() }` ; `plane.hover(t)` (oscillation autour de la dernière pose).
 - Consumes: `decryptSecret` (Task 4), `persist` (Task 4), `SEAL` (Task 9).
 
 - [ ] **Step 1 : Test du coffre**
@@ -2380,7 +2381,7 @@ function sprite(tex, size) {
 }
 
 // « ? » doré flottant au-dessus du point d'attente ; pulse doucement, peut se dissoudre.
-export function createQuestionMark(dir, altitude = 1.25, size = 0.16) {
+export function createQuestionMark(dir, altitude = 1.30, size = 0.16) {
   const tex = goldCanvas((g, S) => {
     g.font = `bold ${S * 0.8}px Anton, Impact, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('?', S / 2, S * 0.55);
@@ -2412,7 +2413,7 @@ export function createPlane(model) {
   object.add(model);
   const target = new THREE.Vector3();
   const restDir = new THREE.Vector3(0, 0, 1);
-  let restLen = 1.07;
+  let restLen = 1.13;
   return {
     object,
     setPose({ position, target: t, up, roll }) {
@@ -2556,14 +2557,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `src/scene/effects.js` (ajout `createBurst`, `createDestinationMarker`), `src/main.js`, `src/styles.css`
 
 **Interfaces:**
-- Produces: `createBurst(dir, altitude=1.08, count=60) → { object, update(dt) → done:boolean }` ; `createDestinationMarker(dir, altitude=1.1, size=0.12) → { object, show() }` ; `createTicket(root, { onFlip }) → { show(secret, flipped), hide(), setFlipped(bool) }` ; `runUnlockSequence(deps)` où `deps = { qmark, lockCard, flights, plane, rig, toWorldDir, waitVec, finalVec, liftOf, onProgress(e), onArrive(), onLanded(), reducedMotion }`.
+- Produces: `createBurst(dir, altitude=1.14, count=60) → { object, update(dt) → done:boolean }` ; `createDestinationMarker(dir, altitude=1.16, size=0.12) → { object, show() }` ; `createTicket(root, { onFlip }) → { show(secret, flipped), hide(), setFlipped(bool) }` ; `runUnlockSequence(deps)` où `deps = { qmark, lockCard, flights, plane, rig, toWorldDir, waitVec, finalVec, liftOf, onProgress(e), onArrive(), onLanded(), reducedMotion }`.
 - Consumes: `planePose` (Task 8), `vault.get()` (Task 10).
 
 - [ ] **Step 1 : Ajouter à `src/scene/effects.js`**
 
 ```js
 // Éclat de particules dorées qui montent puis s'éteignent (1,2 s).
-export function createBurst(dir, altitude = 1.08, count = 60) {
+export function createBurst(dir, altitude = 1.14, count = 60) {
   const LIFE = 1.2;
   const pos = new Float32Array(count * 3), vel = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -2590,7 +2591,7 @@ export function createBurst(dir, altitude = 1.08, count = 60) {
 }
 
 // Big Ben stylisé (silhouette dorée) au-dessus de la destination.
-export function createDestinationMarker(dir, altitude = 1.1, size = 0.12) {
+export function createDestinationMarker(dir, altitude = 1.16, size = 0.12) {
   const tex = goldCanvas((g, S) => {
     const u = S / 24;
     g.fillRect(9 * u, 7 * u, 6 * u, 15 * u);                        // tour
