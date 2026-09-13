@@ -4,6 +4,9 @@ import { addLights } from './scene/lights.js';
 import { createStars } from './scene/stars.js';
 import { setupDebug, isDebug } from './scene/debug.js';
 import { stops, mystery } from './content.js';
+import { latLonToVec3 } from './lib/geo.js';
+import { createRoute } from './scene/route.js';
+import { initialState, WAIT } from './state.js';
 
 const BASE = import.meta.env.BASE_URL;
 const canvas = document.getElementById('scene');
@@ -31,6 +34,14 @@ resize();
 const globe = await loadGlobe(`${BASE}models/earth.glb`, (p) => console.log('globe', Math.round(p * 100) + '%'));
 scene.add(globe.root);
 console.log('relief max', globe.reliefRadius.toFixed(3));
+
+const stopsVec = stops.map((s) => latLonToVec3(s.lat, s.lon));
+const waitVec = latLonToVec3(mystery.waitPoint.lat, mystery.waitPoint.lon);
+const finalVec = latLonToVec3(mystery.destination.lat, mystery.destination.lon);
+const route = createRoute({ stopsVec, waitVec, finalVec });
+globe.root.add(route.group);
+// Aperçu temporaire : tout le trajet visité + attente atteinte (retiré en Task 9)
+route.showFor({ ...initialState(), phase: 'LOCKED', stop: WAIT, visited: [0, 1, 2, 3, 4, 5, 6], waitReached: true }, 0);
 
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
