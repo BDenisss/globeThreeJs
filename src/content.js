@@ -20,8 +20,4 @@ export const mystery = {
   destination: { lat: 51.5074, lon: -0.1278 },
 };
 
-// Remplis par `npm run seal` — ne pas éditer à la main.
-export const codeSalt = "f00306033641cb7ee965eb1fe5e43a9b";
-export const codeHash = "edeabe3b599862496844916fab713335e22e3a494caae48e24f874873eb4eecc";
-
 export const credits = "Globe : Jacobs Development · Avion : Poly by Google — CC BY";

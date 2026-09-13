@@ -13,12 +13,6 @@ export const bytesToHex = (b) => [...b].map((x) => x.toString(16).padStart(2, '0
 export const bytesToB64 = (b) => btoa(String.fromCharCode(...b));
 export const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-export async function sha256Hex(text) {
-  const d = await subtle.digest('SHA-256', enc.encode(text));
-  return bytesToHex(new Uint8Array(d));
-}
-export const hashCode = (code, saltHex) => sha256Hex(saltHex + code);
-
 async function deriveKey(code, saltBytes) {
   const base = await subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveKey']);
   return subtle.deriveKey(

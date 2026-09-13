@@ -4,9 +4,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, argv } from 'node:process';
-import { seal, patchContent } from './sealLib.mjs';
+import { seal } from './sealLib.mjs';
 
-const CONTENT_PATH = new URL('../src/content.js', import.meta.url);
 const SECRET_PATH = new URL('../public/secret.enc', import.meta.url);
 
 function arg(name) {
@@ -21,8 +20,8 @@ async function askMasked(question) {
     stdin.setRawMode(true); stdin.resume(); stdin.setEncoding('utf8');
     const onData = (ch) => {
       if (ch === '\r' || ch === '\n') { stdin.setRawMode(false); stdin.pause(); stdin.off('data', onData); stdout.write('\n'); resolve(buf); }
-      else if (ch === '') { process.exit(1); }
-      else if (ch === '' || ch === '\b') { buf = buf.slice(0, -1); }
+      else if (ch === '\u0003') { process.exit(1); }
+      else if (ch === '\u007f' || ch === '\b') { buf = buf.slice(0, -1); }
       else { buf += ch; stdout.write('•'); }
     };
     stdin.on('data', onData);
@@ -54,8 +53,7 @@ const { code, content } = arg('code') && arg('file')
 
 if (!/^\d{4,8}$/.test(code)) { console.error('Le code doit faire 4 à 8 chiffres.'); process.exit(1); }
 
-const { salt, hash, sealed } = await seal(code, content);
+const { sealed } = await seal(code, content);
 writeFileSync(SECRET_PATH, JSON.stringify(sealed));
-writeFileSync(CONTENT_PATH, patchContent(readFileSync(CONTENT_PATH, 'utf8'), salt, hash));
-console.log(`OK — secret.enc écrit, content.js mis à jour (codeLength attendu : ${code.length}).`);
+console.log(`OK — secret.enc écrit (codeLength attendu : ${code.length}).`);
 console.log(`Destination : ${content.destination} · ${content.dates}`);
