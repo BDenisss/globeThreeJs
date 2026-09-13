@@ -45,6 +45,8 @@ export function createPlane(model) {
   const object = new THREE.Group();
   object.add(model);
   const target = new THREE.Vector3();
+  const restDir = new THREE.Vector3(0, 0, 1);
+  let restLen = 1.13;
   return {
     object,
     setPose({ position, target: t, up, roll }) {
@@ -53,6 +55,10 @@ export function createPlane(model) {
       target.set(t.x, t.y, t.z);
       object.lookAt(target);        // pour un Object3D, +Z regarde la cible
       object.rotateZ(roll);
+      restDir.copy(object.position).normalize();
+      restLen = object.position.length();
     },
+    // Flottement vertical ±0.01 (période 2 s) autour de la dernière pose.
+    hover(t) { object.position.copy(restDir).multiplyScalar(restLen + 0.01 * Math.sin(Math.PI * t)); },
   };
 }

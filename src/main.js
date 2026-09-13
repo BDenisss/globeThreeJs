@@ -15,9 +15,18 @@ import { setupDebug, isDebug } from './scene/debug.js';
 import { bindInput, createChevrons } from './ui/input.js';
 import { createTimeline } from './ui/timeline.js';
 import { createStopCard } from './ui/stopCard.js';
+import { persist } from './lib/persist.js';
+import { createSecretVault } from './app/secret.js';
+import { createLockCard } from './ui/lockCard.js';
+import { createKeypad } from './ui/keypad.js';
+import { createQuestionMark } from './scene/effects.js';
 
 const BASE = import.meta.env.BASE_URL;
 const ui = document.getElementById('ui');
+
+if (new URLSearchParams(location.search).has('reset')) { persist.reset(); location.replace(location.pathname); }
+// Déclaré tôt : utilisé par le « ? » (chargement) et par le coffre (état).
+const unlocked = persist.isUnlocked();
 
 // ---------- rendu ----------
 const canvas = document.getElementById('scene');
@@ -58,12 +67,18 @@ const route = createRoute({ stopsVec, waitVec, finalVec });
 globe.root.add(route.group);
 const plane = createPlane(planeModel);
 globe.root.add(plane.object);
+const qmark = createQuestionMark(waitVec);
+globe.root.add(qmark.object);
+if (unlocked) qmark.hide();
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
 
 // ---------- état ----------
-const store = createStore(initialState(), reduce);
+const vault = createSecretVault({ url: `${BASE}secret.enc` });
+let secretReady = false;
+if (unlocked && persist.getSessionCode()) secretReady = (await vault.tryCode(persist.getSessionCode())).ok;
+const store = createStore(initialState({ unlocked, secretReady }), reduce);
 const flights = createFlightRunner();
 const tmp = new THREE.Vector3();
 const toWorldDir = (v) => { tmp.set(v.x, v.y, v.z); globe.root.localToWorld(tmp); return { x: tmp.x, y: tmp.y, z: tmp.z }; };
@@ -93,11 +108,36 @@ const timeline = createTimeline(ui, stops, { onSelect: (i) => dispatch('GOTO', {
 const stopCard = createStopCard(ui);
 const chevrons = createChevrons(ui, { onNext: () => dispatch('NEXT'), onPrev: () => dispatch('PREV') });
 bindInput(document.body, { onNext: () => dispatch('NEXT'), onPrev: () => dispatch('PREV') });
+const lockCard = createLockCard(ui, { onOpen: () => dispatch('OPEN_LOCK') });
+const keypad = createKeypad(ui, {
+  length: mystery.codeLength,
+  onClose: () => dispatch('CLOSE_LOCK'),
+  async onSubmit(code) {
+    const r = await vault.tryCode(code);
+    if (r.ok) {
+      persist.setUnlocked(); persist.setSessionCode(code);
+      keypad.success();
+      setTimeout(() => dispatch('CODE_OK'), 400);
+    } else if (r.missing) {
+      keypad.shake('Le secret est introuvable, contacte Mimi.');
+    } else {
+      dispatch('CODE_KO');
+      keypad.shake('Pas encore… relis bien la carte.');
+    }
+  },
+});
 
 store.subscribe((state, prev) => {
   if (prev.phase === 'INTRO') rig.setMode('travel');
   if (state.phase === 'FLYING' && prev.phase !== 'FLYING') { stopCard.hide(); startFlight(state.flight); }
   if (state.phase === 'AT_STOP' && prev.phase !== 'AT_STOP') { restAt(state.stop); stopCard.show(stops[state.stop]); }
+  if (state.phase === 'LOCKED' && prev.phase !== 'LOCKED') {
+    restAt(state.stop);
+    lockCard.show({ hint: state.reentry ? mystery.reentryHint : mystery.hint });
+  }
+  if (state.phase !== 'LOCKED' && prev.phase === 'LOCKED') lockCard.hide();
+  if (state.lockOpen && !prev.lockOpen) keypad.open();
+  if (!state.lockOpen && prev.lockOpen) keypad.close();
   timeline.render(state);
   chevrons.render(state);
 });
@@ -114,7 +154,10 @@ renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (store.get().phase === 'INTRO' && !debug) globe.root.rotation.y += 0.05 * dt;
   flights.update(dt);
-  route.showFor(store.get(), flightProgress);
+  const st = store.get();
+  qmark.update(dt, now / 1000);
+  if (st.phase === 'LOCKED' && st.stop === WAIT) plane.hover(now / 1000);
+  route.showFor(st, flightProgress);
   if (debug) debug.update(dt); else rig.update(dt);
   renderer.render(scene, camera);
 });

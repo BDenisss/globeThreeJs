@@ -54,3 +54,33 @@ html, body { margin: 0; height: 100%; background: var(--nuit); color: var(--crem
   font-size: 44px; line-height: 1; cursor: pointer; opacity: .8;
 }
 .chevron-prev { left: 4px; } .chevron-next { right: 4px; }
+
+/* --- carte verrouillée --- */
+.lock-card .seal { width: 72px; margin: 0 auto 6px; }
+.lock-card .seal svg { width: 100%; height: auto; display: block; }
+.lock-hint { font-size: 15px; line-height: 1.45; margin: 8px 0 12px; }
+.btn-or { font-family: var(--titre); letter-spacing: .08em; font-size: 15px; background: var(--or); color: var(--noir); border: 0; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
+
+/* --- pavé numérique --- */
+.keypad {
+  position: absolute; inset: 0; background: rgba(20,20,20,.92);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  transition: opacity .4s;
+}
+.keypad.out { opacity: 0; }
+.keypad-slots { display: flex; gap: 10px; }
+.slot {
+  width: 44px; height: 54px; border: 1.5px solid var(--or); border-radius: 8px;
+  display: grid; place-items: center; font-family: var(--titre); font-size: 28px; color: var(--creme);
+  transition: background .2s, color .2s;
+}
+.slot.ok { background: var(--or); color: var(--noir); }
+.keypad.shake .keypad-slots { animation: shake .4s; }
+@keyframes shake { 0%,100% { transform: none } 20%,60% { transform: translateX(-6px) } 40%,80% { transform: translateX(6px) } }
+.keypad-msg { min-height: 1.4em; margin: 0; font-size: 14px; color: var(--creme); opacity: .9; }
+.keypad-grid { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+.key {
+  height: 60px; border-radius: 12px; border: 1px solid rgba(217,182,92,.5); background: transparent;
+  color: var(--creme); font-family: var(--titre); font-size: 24px; cursor: pointer;
+}
+.key:active { background: rgba(217,182,92,.2); }
