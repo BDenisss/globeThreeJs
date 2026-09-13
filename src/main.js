@@ -1,82 +1,120 @@
 import * as THREE from 'three';
+import { stops, mystery } from './content.js';
+import { latLonToVec3, liftFor, angleBetween } from './lib/geo.js';
+import { initialState, reduce, WAIT, FINAL, LAST_REAL } from './state.js';
+import { createStore } from './app/store.js';
+import { createFlightRunner } from './app/flight.js';
 import { loadGlobe } from './scene/globe.js';
 import { addLights } from './scene/lights.js';
 import { createStars } from './scene/stars.js';
-import { setupDebug, isDebug } from './scene/debug.js';
-import { stops, mystery } from './content.js';
-import { latLonToVec3 } from './lib/geo.js';
 import { createRoute } from './scene/route.js';
-import { initialState, WAIT } from './state.js';
-import { createCameraRig } from './scene/camera.js';
 import { loadPlane, createPlane } from './scene/plane.js';
 import { planePose, restPose } from './scene/planePose.js';
-import { createFlightRunner } from './app/flight.js';
-import { liftFor, angleBetween } from './lib/geo.js';
+import { createCameraRig } from './scene/camera.js';
+import { setupDebug, isDebug } from './scene/debug.js';
+import { bindInput, createChevrons } from './ui/input.js';
+import { createTimeline } from './ui/timeline.js';
+import { createStopCard } from './ui/stopCard.js';
 
 const BASE = import.meta.env.BASE_URL;
+const ui = document.getElementById('ui');
+
+// ---------- rendu ----------
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1026);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-addLights(scene);
-scene.add(createStars());
-
 const rig = createCameraRig(camera);
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   rig.setViewport(w, h);
 }
-const liftOf = (a, b) => liftFor(angleBetween(a, b));
 window.addEventListener('resize', resize);
 resize();
+addLights(scene);
+scene.add(createStars());
 
-const globe = await loadGlobe(`${BASE}models/earth.glb`, (p) => console.log('globe', Math.round(p * 100) + '%'));
-scene.add(globe.root);
-console.log('relief max', globe.reliefRadius.toFixed(3));
-
+// ---------- géographie ----------
 const stopsVec = stops.map((s) => latLonToVec3(s.lat, s.lon));
 const waitVec = latLonToVec3(mystery.waitPoint.lat, mystery.waitPoint.lon);
 const finalVec = latLonToVec3(mystery.destination.lat, mystery.destination.lon);
+const vecOf = (i) => (i === WAIT ? waitVec : i === FINAL ? finalVec : stopsVec[i]);
+// Direction du nez de l'avion posé : la prochaine étape (à Londres : vers Paris, jamais vers lui-même).
+const nextVec = (i) => (i === WAIT ? finalVec : i === FINAL ? stopsVec[0] : i === LAST_REAL ? waitVec : stopsVec[i + 1]);
+const liftOf = (a, b) => liftFor(angleBetween(a, b));
+const REST_ALT = { default: 1.13, wait: 1.16 };
+
+// ---------- chargement ----------
+const [globe, planeModel] = await Promise.all([
+  loadGlobe(`${BASE}models/earth.glb`),
+  loadPlane(`${BASE}models/plane.glb`),
+]);
+scene.add(globe.root);
 const route = createRoute({ stopsVec, waitVec, finalVec });
 globe.root.add(route.group);
-// Aperçu temporaire : tout le trajet visité + attente atteinte (retiré en Task 9)
-route.showFor({ ...initialState(), phase: 'LOCKED', stop: WAIT, visited: [0, 1, 2, 3, 4, 5, 6], waitReached: true }, 0);
-
-const plane = createPlane(await loadPlane(`${BASE}models/plane.glb`));
+const plane = createPlane(planeModel);
 globe.root.add(plane.object);
-plane.setPose(restPose(stopsVec[0], stopsVec[1]));
-const flights = createFlightRunner();
-const tmpWorld = new THREE.Vector3();
-const toWorldDir = (v) => { tmpWorld.set(v.x, v.y, v.z); globe.root.localToWorld(tmpWorld); return { x: tmpWorld.x, y: tmpWorld.y, z: tmpWorld.z }; };
-
-// Démo temporaire (retirée en Task 9) : touche N = vol vers l étape suivante
-let demoIdx = 0;
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'n' || flights.active() || demoIdx >= 6) return;
-  const from = stopsVec[demoIdx], to = stopsVec[demoIdx + 1];
-  rig.setMode('travel');
-  flights.start({
-    from, to,
-    onProgress: (e2) => { const p = planePose(from, to, e2, liftOf(from, to)); plane.setPose(p); rig.setDirection(toWorldDir(p.position)); },
-    onDone: () => { demoIdx++; plane.setPose(restPose(to, demoIdx < 6 ? stopsVec[demoIdx + 1] : waitVec)); },
-  });
-});
-
 const debug = isDebug()
   ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
 
+// ---------- état ----------
+const store = createStore(initialState(), reduce);
+const flights = createFlightRunner();
+const tmp = new THREE.Vector3();
+const toWorldDir = (v) => { tmp.set(v.x, v.y, v.z); globe.root.localToWorld(tmp); return { x: tmp.x, y: tmp.y, z: tmp.z }; };
+let flightProgress = 0;
+
+function restAt(stop) {
+  plane.setPose(restPose(vecOf(stop), nextVec(stop), stop === WAIT ? REST_ALT.wait : REST_ALT.default));
+  rig.setDirection(toWorldDir(vecOf(stop)));
+}
+function startFlight({ from, to, backwards }) {
+  const a = vecOf(from), b = vecOf(to), lift = liftOf(a, b);
+  flights.start({
+    from: a, to: b, backwards,
+    onProgress(e) {
+      flightProgress = e;
+      const p = planePose(a, b, e, lift);
+      plane.setPose(p);
+      rig.setDirection(toWorldDir(p.position));
+    },
+    onDone() { flightProgress = 0; store.dispatch({ type: 'ARRIVED' }); },
+  });
+}
+
+// ---------- UI ----------
+const dispatch = (type, extra = {}) => store.dispatch({ type, ...extra });
+const timeline = createTimeline(ui, stops, { onSelect: (i) => dispatch('GOTO', { index: i }) });
+const stopCard = createStopCard(ui);
+const chevrons = createChevrons(ui, { onNext: () => dispatch('NEXT'), onPrev: () => dispatch('PREV') });
+bindInput(document.body, { onNext: () => dispatch('NEXT'), onPrev: () => dispatch('PREV') });
+
+store.subscribe((state, prev) => {
+  if (prev.phase === 'INTRO') rig.setMode('travel');
+  if (state.phase === 'FLYING' && prev.phase !== 'FLYING') { stopCard.hide(); startFlight(state.flight); }
+  if (state.phase === 'AT_STOP' && prev.phase !== 'AT_STOP') { restAt(state.stop); stopCard.show(stops[state.stop]); }
+  timeline.render(state);
+  chevrons.render(state);
+});
+timeline.render(store.get());
+chevrons.render(store.get());
+restAt(0);
+
+// Temporaire (l'écran d'accueil arrive en Task 12) : décollage immédiat.
+dispatch('START');
+
+// ---------- boucle ----------
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (store.get().phase === 'INTRO' && !debug) globe.root.rotation.y += 0.05 * dt;
   flights.update(dt);
-  rig.update(dt);
-  if (debug) debug.update(dt);
-  else if (!flights.active() && demoIdx === 0) globe.root.rotation.y += 0.05 * dt;
+  route.showFor(store.get(), flightProgress);
+  if (debug) debug.update(dt); else rig.update(dt);
   renderer.render(scene, camera);
 });
