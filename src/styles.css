@@ -21,9 +21,9 @@ html, body { margin: 0; height: 100%; background: var(--nuit); color: var(--crem
   background: rgba(20, 20, 20, .85); border: 1px solid var(--or); border-radius: 12px;
   padding: 16px 18px; text-align: center;
   transform: translateY(120%); opacity: 0;
-  transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s;
+  transition: transform .2s ease-in, opacity .2s ease-in;
 }
-.card.in { transform: none; opacity: 1; }
+.card.in { transform: none; opacity: 1; transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s; }
 .card-name { font-family: var(--titre); font-size: 28px; letter-spacing: .04em; color: var(--or); margin: 0; font-weight: 400; }
 .card-sub { font-style: italic; font-size: 14px; margin: 6px 0 0; }
 .card-dates { font-size: 14px; opacity: .8; margin: 4px 0 0; }
