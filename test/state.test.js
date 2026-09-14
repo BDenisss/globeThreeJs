@@ -97,9 +97,6 @@ describe('verrou et révélation', () => {
     s = run(s, 'OPEN_LOCK', 'CODE_OK');
     expect(s.phase).toBe('REVEALED'); expect(s.reentry).toBe(false);
   });
-  it('SECRET_READY marque le secret disponible', () => {
-    expect(run(initialState(), 'SECRET_READY').secretReady).toBe(true);
-  });
 });
 
 describe('prédicats', () => {

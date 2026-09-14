@@ -23,6 +23,8 @@ export function createDashedArc(a, b, { altitude = 1.10, dash = 0.018, gap = 0.0
     mesh.setMatrixAt(i, m);
   }
   mesh.instanceMatrix.needsUpdate = true;
+  // Calculer la sphère englobante pendant que count === total : sinon three.js met en cache une sphère vide au premier rendu et le mesh est éliminé par le frustum culling pour toujours.
+  mesh.computeBoundingSphere();
   mesh.count = 0;
   return { mesh, total, setProgress(t) { mesh.count = Math.round(Math.min(1, Math.max(0, t)) * total); } };
 }

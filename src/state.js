@@ -34,8 +34,6 @@ export function reduce(s, action) {
   switch (action.type) {
     case 'START':
       return s.phase === 'INTRO' ? { ...s, phase: 'AT_STOP' } : s;
-    case 'SECRET_READY':
-      return { ...s, secretReady: true };
     case 'NEXT': {
       if (!canNext(s)) return s;
       if (s.stop < LAST_REAL) return fly(s, s.stop + 1, false);

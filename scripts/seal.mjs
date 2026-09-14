@@ -14,6 +14,7 @@ function arg(name) {
 }
 
 async function askMasked(question) {
+  if (!stdin.isTTY) { console.error('Entrée non interactive : utilise --code <code> --file <json>.'); process.exit(1); }
   return new Promise((resolve) => {
     stdout.write(question);
     let buf = '';
@@ -31,6 +32,7 @@ async function askMasked(question) {
 async function askAll() {
   const rl = createInterface({ input: stdin, output: stdout });
   const content = {};
+  content.band = await rl.question('Bandeau du billet (ex. EUROSTAR · BOARDING PASS) : ');
   content.destination = await rl.question('Destination (ex. LONDRES) : ');
   content.dates = await rl.question('Dates (ex. 2 – 4 OCT 2026) : ');
   content.from = await rl.question('Gare de départ (ex. PARIS GARE DU NORD) : ');

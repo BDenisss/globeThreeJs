@@ -60,7 +60,8 @@ export function createBurst(dir, altitude = 1.14, count = 60) {
     object: points,
     update(dt) {
       life += dt;
-      for (let i = 0; i < count * 3; i++) { pos[i] += vel[i] * dt; vel[i] *= 0.96; }
+      const damp = Math.pow(0.96, dt * 60);   // amortissement calé sur 60 fps, indépendant de la cadence réelle
+      for (let i = 0; i < count * 3; i++) { pos[i] += vel[i] * dt; vel[i] *= damp; }
       geo.attributes.position.needsUpdate = true;
       mat.opacity = Math.max(0, 1 - life / LIFE);
       return life >= LIFE;

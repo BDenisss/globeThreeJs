@@ -4,7 +4,7 @@ export function createTicket(root, { onFlip }) {
   wrap.innerHTML = `
     <div class="ticket" role="button" tabindex="0" aria-label="Retourner le billet">
       <div class="ticket-face ticket-front">
-        <div class="t-band">EUROSTAR · BOARDING PASS</div>
+        <div class="t-band"></div>
         <div class="t-route"><span class="t-from"></span><span class="t-arrow">→</span><span class="t-to"></span></div>
         <div class="t-dest"></div>
         <div class="t-dates"></div>
@@ -26,6 +26,7 @@ export function createTicket(root, { onFlip }) {
   const set = (sel, v) => { wrap.querySelector(sel).textContent = v ?? ''; };
   return {
     show(secret, flipped) {
+      set('.t-band', secret.band || 'BOARDING PASS');
       set('.t-from', secret.from); set('.t-to', secret.to); set('.t-dest', secret.destination);
       set('.t-dates', secret.dates); set('.t-pax', secret.passengers); set('.t-msg', secret.message);
       hint.hidden = hintDone;

@@ -9,7 +9,7 @@ export function loadGlobe(url, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
     new GLTFLoader().load(
       url,
-      (gltf) => resolve(buildGlobe(gltf.scene)),
+      (gltf) => { onProgress(1); resolve(buildGlobe(gltf.scene)); },   // les transferts sans Content-Length ne remontent jamais ev.total
       (ev) => { if (ev.total) onProgress(ev.loaded / ev.total); },
       reject,
     );

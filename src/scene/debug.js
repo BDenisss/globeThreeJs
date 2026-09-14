@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { latLonToVec3, DEG } from '../lib/geo.js';
 import { CALIB } from './globe.js';
 
-export const isDebug = () => new URLSearchParams(location.search).has('debug');
+export const isDebug = () => import.meta.env.DEV && new URLSearchParams(location.search).has('debug');
 
 // points : [{ name, lat, lon }] — un marqueur rouge par point, à l'altitude 1.12 (au-dessus des continents).
 export function setupDebug({ globe, camera, renderer, points }) {

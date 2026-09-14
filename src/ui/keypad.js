@@ -20,7 +20,7 @@ export function createKeypad(root, { length, onSubmit, onClose }) {
     if (k === '✕') b.setAttribute('aria-label', 'Fermer');
     b.addEventListener('click', () => {
       if (k === '⌫') { if (!busy) { buf = buf.slice(0, -1); draw(); } }
-      else if (k === '✕') onClose();
+      else if (k === '✕') { if (!busy) onClose(); }
       else press(k);
     });
     grid.appendChild(b);
@@ -36,6 +36,7 @@ export function createKeypad(root, { length, onSubmit, onClose }) {
       setTimeout(() => { el.classList.remove('shake'); buf = ''; busy = false; draw(); }, 400);
     },
     success() {
+      busy = true;   // ✕ ignoré pendant l'animation de succès ; close() remet busy à false
       slots.forEach((s) => s.classList.add('ok'));
       el.classList.add('out');
       setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 400);

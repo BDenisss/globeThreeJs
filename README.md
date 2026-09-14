@@ -10,7 +10,7 @@ Tout est dans `src/content.js` : titre, étapes (nom, sous-titre, dates, coordon
 npm install
 npm run seal
 ```
-Le script demande le contenu du billet, le message du verso et le code (masqué). Il écrit `public/secret.enc` (chiffré AES-GCM, clé dérivée du code par PBKDF2). Le code et le contenu en clair ne sont jamais enregistrés, et aucun hash du code n'est publié : seul le bon code déchiffre le fichier. Mets `mystery.codeLength` à la longueur du code choisi.
+Le script demande aussi le bandeau du billet (ex. « EUROSTAR · BOARDING PASS »), le contenu du billet, le message du verso et le code (masqué). Il écrit `public/secret.enc` (chiffré AES-GCM, clé dérivée du code par PBKDF2). Le code et le contenu en clair ne sont jamais enregistrés, et aucun hash du code n'est publié : seul le bon code déchiffre le fichier. Mets `mystery.codeLength` à la longueur du code choisi.
 
 ## Développer
 ```bash

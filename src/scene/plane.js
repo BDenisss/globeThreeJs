@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const WINGSPAN = 0.12;
+const PLANE_SIZE = 0.12;   // plus grande dimension du modèle (≈ envergure pour un avion de ligne)
 // Rotation Y (rad) à appliquer au glb pour que son nez pointe vers +Z (à ajuster à l'œil si besoin).
 const GLB_YAW = 0;
 
@@ -11,7 +11,7 @@ export function buildProceduralPlane() {
   const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 });
   const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.09, 4, 8), gold);
   fuselage.rotation.x = Math.PI / 2; g.add(fuselage);
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(WINGSPAN, 0.004, 0.022), gold); wing.position.z = -0.005; g.add(wing);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(PLANE_SIZE, 0.004, 0.022), gold); wing.position.z = -0.005; g.add(wing);
   const tail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.003, 0.014), gold); tail.position.z = -0.05; g.add(tail);
   const fin = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.022, 0.016), dark); fin.position.set(0, 0.012, -0.05); g.add(fin);
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), dark); nose.position.z = 0.056; g.add(nose);
@@ -25,7 +25,7 @@ function normalizeGlb(sceneObj) {
   const inner = new THREE.Group();
   sceneObj.position.sub(center);
   inner.add(sceneObj);
-  inner.scale.setScalar(WINGSPAN / Math.max(size.x, size.y, size.z));
+  inner.scale.setScalar(PLANE_SIZE / Math.max(size.x, size.y, size.z));
   const outer = new THREE.Group();
   inner.rotation.y = GLB_YAW;
   outer.add(inner);

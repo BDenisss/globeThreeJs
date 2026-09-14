@@ -35,7 +35,10 @@ if (!hasWebGL()) {
   throw new Error('WebGL indisponible');
 }
 
-if (new URLSearchParams(location.search).has('reset')) { persist.reset(); location.replace(location.pathname); }
+if (new URLSearchParams(location.search).has('reset')) {
+  persist.reset(); location.replace(location.pathname);
+  throw new Error('reset');   // stoppe le module : sinon renderer, fetch et modèles démarrent pour rien pendant la navigation
+}
 // Déclaré tôt : utilisé par le « ? » (chargement) et par le coffre (état).
 const unlocked = persist.isUnlocked();
 
@@ -63,9 +66,14 @@ scene.add(createStars());
 const stopsVec = stops.map((s) => latLonToVec3(s.lat, s.lon));
 const waitVec = latLonToVec3(mystery.waitPoint.lat, mystery.waitPoint.lon);
 const finalVec = latLonToVec3(mystery.destination.lat, mystery.destination.lon);
+// Vecteurs décalés vers le nord pour le « ? » et le marqueur : sinon ils sont sur la même radiale que l'avion (superposés à l'écran).
+const qmarkVec = latLonToVec3(mystery.waitPoint.lat + 4, mystery.waitPoint.lon);
+const markerVec = latLonToVec3(mystery.destination.lat + 4, mystery.destination.lon);
 const vecOf = (i) => (i === WAIT ? waitVec : i === FINAL ? finalVec : stopsVec[i]);
 // Direction du nez de l'avion posé : la prochaine étape (à Londres : vers Paris, jamais vers lui-même).
-const nextVec = (i) => (i === WAIT ? finalVec : i === FINAL ? stopsVec[0] : i === LAST_REAL ? waitVec : stopsVec[i + 1]);
+// Au point d'attente, cap neutre vers le nord (pas vers la destination, qui reste un secret).
+const NORTH = { x: 0, y: 1, z: 0 };
+const nextVec = (i) => (i === WAIT ? NORTH : i === FINAL ? stopsVec[0] : i === LAST_REAL ? waitVec : stopsVec[i + 1]);
 const liftOf = (a, b) => liftFor(angleBetween(a, b));
 const REST_ALT = { default: 1.13, wait: 1.16 };
 
@@ -84,10 +92,17 @@ const progress = { globe: 0, plane: 0 };
 const report = () => intro.setProgress(progress.globe * 0.8 + progress.plane * 0.2);
 
 // ---------- chargement ----------
-const [globe, planeModel] = await Promise.all([
-  loadGlobe(`${BASE}models/earth.glb`, (p) => { progress.globe = p; report(); }),
-  loadPlane(`${BASE}models/plane.glb`).then((m) => { progress.plane = 1; report(); return m; }),
-]);
+let globe, planeModel;
+try {
+  [globe, planeModel] = await Promise.all([
+    loadGlobe(`${BASE}models/earth.glb`, (p) => { progress.globe = p; report(); }),
+    loadPlane(`${BASE}models/plane.glb`).then((m) => { progress.plane = 1; report(); return m; }),
+  ]);
+} catch (err) {
+  console.error(err);
+  intro.setError('Le globe n\'a pas pu se charger — vérifie ta connexion et recharge.');
+  throw err;
+}
 
 // ---------- scène ----------
 scene.add(globe.root);
@@ -95,16 +110,18 @@ const route = createRoute({ stopsVec, waitVec, finalVec });
 globe.root.add(route.group);
 const plane = createPlane(planeModel);
 globe.root.add(plane.object);
-const qmark = createQuestionMark(waitVec);
+const qmark = createQuestionMark(qmarkVec);
 globe.root.add(qmark.object);
 if (unlocked) qmark.hide();
-const marker = createDestinationMarker(finalVec);
+const marker = createDestinationMarker(markerVec);
 globe.root.add(marker.object);
 if (unlocked) marker.show();
 const bursts = [];
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const debug = isDebug()
-  ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'londres', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
+// `import.meta.env.DEV` répété ici (en plus de isDebug()) : replié en dur par Vite au build, ce qui permet
+// au bundler d'éliminer statiquement tout cet appel (et OrbitControls) du bundle de production.
+const debug = import.meta.env.DEV && isDebug()
+  ? setupDebug({ globe, camera, renderer, points: [...stops, { name: 'final', ...mystery.destination }, { name: 'wait', ...mystery.waitPoint }] })
   : null;
 const tmp = new THREE.Vector3();
 const toWorldDir = (v) => { tmp.set(v.x, v.y, v.z); globe.root.localToWorld(tmp); return { x: tmp.x, y: tmp.y, z: tmp.z }; };
@@ -176,7 +193,8 @@ store.subscribe((state, prev) => {
     });
   }
   if (state.phase === 'REVEALED' && prev.phase !== 'REVEALED') {
-    restAt(FINAL);
+    // L'avion vient d'atterrir (depuis UNLOCKING) : ne pas le réorienter d'un coup.
+    if (prev.phase !== 'UNLOCKING') restAt(FINAL);
     marker.show();
     ticket.show(vault.get(), state.ticketFlipped);
   }

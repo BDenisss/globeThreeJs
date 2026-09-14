@@ -21,6 +21,7 @@ function solve4(A, b) {
     let p = c;
     for (let r = c + 1; r < 4; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
     [M[c], M[p]] = [M[p], M[c]];
+    if (Math.abs(M[c][c]) < 1e-12) throw new Error('fitSphere : système singulier');
     for (let r = 0; r < 4; r++) {
       if (r === c || M[c][c] === 0) continue;
       const f = M[r][c] / M[c][c];
