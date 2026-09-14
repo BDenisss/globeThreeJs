@@ -72,9 +72,9 @@ html, body { margin: 0; height: 100%; background: var(--nuit); color: var(--crem
   z-index: 30;
 }
 .keypad.out { opacity: 0; }
-.keypad-slots { display: flex; gap: 10px; }
+.keypad-slots { display: flex; gap: 8px; width: min(100% - 32px, 420px); justify-content: center; }
 .slot {
-  width: 44px; height: 54px; border: 1.5px solid var(--or); border-radius: 8px;
+  flex: 1 1 0; min-width: 0; max-width: 44px; height: 54px; border: 1.5px solid var(--or); border-radius: 8px;
   display: grid; place-items: center; font-family: var(--titre); font-size: 28px; color: var(--creme);
   transition: background .2s, color .2s;
 }
