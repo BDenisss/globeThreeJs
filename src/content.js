@@ -13,9 +13,9 @@ export const stops = [
 ];
 
 export const mystery = {
-  hint: "Ton indice écrit ici.",
+  hint: "Là où tout a commencé",
   reentryHint: "Entre à nouveau le code pour revoir ton billet.",
-  codeLength: 6,
+  codeLength: 8,
   waitPoint: { lat: 45, lon: -12 },
   destination: { lat: 51.5074, lon: -0.1278 },
 };
