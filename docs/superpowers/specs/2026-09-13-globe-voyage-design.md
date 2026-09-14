@@ -100,14 +100,14 @@ Principe : **`state.js` et `lib/*` ne dépendent pas de three.js ni du DOM** ; i
 
 ### 4.5 Point d'attente et « ? »
 
-Pour ne pas trahir la destination, le point d'attente n'est **pas** sur la trajectoire Barcelone → Londres. Il est au large dans l'Atlantique : `lat 45, lon −12`. Un « ? » doré (sprite dessiné sur canvas, taille 0,16) flotte à l'altitude 1,30 au-dessus de ce point et pulse doucement (±6 % de taille). Il est visible dès le début du parcours (teaser), sauf si le site est déjà déverrouillé. Il se dissout (opacité → 0 en 0,6 s) au déverrouillage. L'avion, lui, flotte à l'altitude 1,16 sous le « ? ».
+Pour ne pas trahir la destination, le point d'attente n'est **pas** sur la trajectoire Barcelone → Londres. Il est au large dans l'Atlantique : `lat 45, lon −12`. Un « ? » doré (sprite dessiné sur canvas, taille 0,16) flotte à l'altitude 1,30 au-dessus de ce point et pulse doucement (±6 % de taille). Il est visible dès le début du parcours (teaser), sauf si le site est déjà déverrouillé. Il se dissout (opacité → 0 en 0,6 s) au déverrouillage. L'avion, lui, flotte à l'altitude 1,16 ; le « ? » (et, à Londres, le marqueur Big Ben) est placé **4° de latitude plus au nord** que le point de l'avion, sinon les deux se superposent à l'écran (même radiale que la caméra). Au point d'attente, le nez de l'avion pointe vers le nord (cap neutre), pas vers la destination.
 
 ### 4.6 Caméra (`scene/camera.js`)
 
 - `PerspectiveCamera` (fov 45 portrait / 38 paysage), toujours orientée vers le centre du globe.
 - Position cible : sur la droite centre → étape courante, à distance `D` (2,6 en portrait mobile, 2,2 en paysage/desktop), avec un décalage vertical pour laisser la place à la carte d'étape en bas (le globe est légèrement remonté à l'écran).
 - Transition : la caméra `slerp` d'une direction à l'autre pendant le vol, sur la même durée que l'avion, easing `easeInOutCubic` ; l'avion reste donc au centre de l'écran.
-- Pendant `INTRO` : la caméra est plus loin (D = 3,4), globe entier visible.
+- Pendant `INTRO` : la caméra recule pour que le globe entier soit visible quel que soit le format : `D = 1,136 × 1,08 / sin(min(fov/2, atan(tan(fov/2) · aspect)))` (≈ 6,0 en portrait 375 × 812, ≈ 3,5 en paysage), recalculé à chaque redimensionnement.
 - Pas d'`OrbitControls` libres : l'utilisateur ne fait pas tourner le globe à la main (sinon les swipes de navigation entrent en conflit). Un drag horizontal lent (> 300 ms sans relâcher) est ignoré ; un swipe rapide navigue.
 
 ### 4.7 Éclairage et fond
@@ -179,7 +179,7 @@ Séquence orchestrée par `main.js` (durées indicatives) :
 3. À l'atterrissage — éclat de ~60 particules or au-dessus de Londres (montée + fondu, 1,2 s) ; un marqueur Big Ben stylisé (SVG sprite) apparaît.
 4. +0,5 s — le **billet** glisse depuis le bas : `LANDED` → `REVEALED`.
 
-**Billet (recto)** : format 340 × 170 px (portrait) : bandeau or « EUROSTAR · BOARDING PASS », « PARIS GARE DU NORD → LONDON ST PANCRAS », « LONDRES » en Anton 34 px or, « 2 – 4 OCT 2026 », passagers « NANO & MIMI », un talon détachable à droite (perforation en pointillé) avec « SURPRISE » à la verticale. Contenu tiré du secret déchiffré, donc modifiable via `seal`.
+**Billet (recto)** : format 340 × 170 px (portrait) : bandeau or dont le texte vient du secret (`band`, ex. « EUROSTAR · BOARDING PASS » — jamais en dur dans le bundle : la p.7 du magazine cache volontairement la compagnie derrière « COMPANY ? »), « PARIS GARE DU NORD → LONDON ST PANCRAS », « LONDRES » en Anton 34 px or, « 2 – 4 OCT 2026 », passagers « NANO & MIMI », un talon détachable à droite (perforation en pointillé) avec « SURPRISE » à la verticale. Contenu tiré du secret déchiffré (`{ band, destination, dates, from, to, passengers, message }`), donc modifiable via `seal`.
 **Billet (verso)** : même format, fond noir, liseré or, le message de Denis (Baskerville 14 px, crème, scrollable si long), signé « Mimi ». Tap sur le billet → retournement 3D CSS (`rotateY`, 600 ms). Un petit texte « touche le billet » apparaît une seule fois sous le billet.
 
 Une fois `REVEALED`, la 8e pastille devient normale ; revenir en arrière puis revenir à Londres rejoue seulement l'arrivée du billet (pas les particules).
@@ -188,7 +188,7 @@ Une fois `REVEALED`, la 8e pastille devient normale ; revenir en arrière puis r
 
 ### 7.1 Ce qui est publié
 - `public/secret.enc` : JSON `{ v: 1, kdfSalt, iv, ciphertext }` (base64), où `ciphertext = AES-GCM-256(key, JSON du contenu)` et `key = PBKDF2-SHA256(code, kdfSalt, 200 000 itérations)`.
-- **Aucun hash du code n'est publié** (décision du 13/09 en revue de la tâche 4) : un `SHA-256(sel + code)` dans le bundle permettrait de retrouver un code à 6 chiffres hors ligne en quelques millisecondes (10⁶ candidats), contournant PBKDF2. La seule vérification est le succès du déchiffrement AES-GCM (tag d'authentification) : chaque essai coûte ~0,3 s de PBKDF2, hors ligne comme en ligne.
+- **Aucun hash du code n'est publié** (décision du 13/09 en revue de la tâche 4) : un `SHA-256(sel + code)` dans le bundle permettrait de retrouver un code à 6 chiffres hors ligne en quelques millisecondes (10⁶ candidats), contournant PBKDF2. La seule vérification est le succès du déchiffrement AES-GCM (tag d'authentification). Coût mesuré : ~33 ms par essai en Node sur PC (≈ 0,3 s sur téléphone) → 10⁶ codes à 6 chiffres ≈ 9 h CPU hors ligne : suffisant pour le modèle de menace (une lectrice curieuse, pas un attaquant) ; un code à 8 chiffres (accepté par `seal`) multiplie ce coût par 100 si Denis veut de la marge.
 - Le contenu clair (`{ destination, dates, from, to, passengers, message }`) n'existe **nulle part** dans le repo.
 
 ### 7.2 Côté navigateur (`lib/crypto.js`)
@@ -196,7 +196,7 @@ Une fois `REVEALED`, la 8e pastille devient normale ; revenir en arrière puis r
 - Le contenu déchiffré est gardé en mémoire uniquement (jamais écrit en `localStorage`). Le code validé est copié dans `sessionStorage['nano.code']` (durée de vie : l'onglet). Au chargement, si `unlocked = 1` et que `sessionStorage` a le code, le secret est déchiffré silencieusement → l'arrivée à Londres donne directement `REVEALED`. Si le code n'est plus en session, l'arrivée donne `LOCKED(reentry)` : la carte demande « Entre à nouveau le code », et le bon code affiche le billet sans rejouer le vol. Ainsi la révélation est retrouvable pendant la lecture, mais jamais stockée en clair durablement.
 
 ### 7.3 `npm run seal` (`scripts/seal.mjs`, Node ≥ 20)
-Pose les questions en ligne de commande : code (masqué), destination, dates, gares, passagers, message (multi-ligne, terminé par une ligne vide). Génère `public/secret.enc` (et rien d'autre : `content.js` n'est pas touché). Vérifie en relisant que le déchiffrement fonctionne avant d'écrire. Affiche un récapitulatif sans le code, avec la longueur attendue pour `mystery.codeLength`.
+Pose les questions en ligne de commande : bandeau du billet, destination, dates, gares, passagers, message, puis code (masqué, confirmé) (multi-ligne, terminé par une ligne vide). Génère `public/secret.enc` (et rien d'autre : `content.js` n'est pas touché). Vérifie en relisant que le déchiffrement fonctionne avant d'écrire. Affiche un récapitulatif sans le code, avec la longueur attendue pour `mystery.codeLength`.
 
 ## 8. Contenu (`src/content.js`)
 
@@ -252,7 +252,9 @@ Denis ouvre l'URL GitHub Pages sur son iPhone : fluidité, swipes, pavé, `?rese
 
 ## 11. Déploiement
 
-- `vite.config.js` : `base: '/'`.
+- `vite.config.js` : `base: '/'` ; `optimizeDeps.include` pour three et ses addons (évite le double chargement de three en dev).
+- Le mode `?debug` est **compilé hors du bundle de production** (`import.meta.env.DEV`) : ni marqueurs, ni OrbitControls, ni littéral de destination en ligne.
+- **Le repo GitHub doit être privé** : cette spec et le plan citent la destination en clair ; un repo public les expose à quiconque connaît l'URL du site (le nom du repo est déductible). Vercel continue de déployer un repo privé.
 - `vercel.json` : preset Vite, sortie `dist/`, cache long sur `/models/`. Denis importe le repo dans Vercel (une fois) ; chaque push sur `main` construit et publie. Les tests ne tournent pas dans le pipeline Vercel : ils sont lancés localement avant chaque commit.
 - URL finale : `https://nano-adventure.vercel.app/` — c'est elle que porte le QR de la p.42.
 - Icône : `public/favicon.svg` (planète cartoon + anneau doré) et `public/apple-touch-icon.png` (180 × 180, fond bleu nuit), référencées dans `index.html`.
