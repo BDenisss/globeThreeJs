@@ -24,4 +24,4 @@ npm run build    # dossier dist/
 Le repo est importé dans Vercel (preset Vite, sortie `dist/`) : chaque push sur `main` déclenche un build et une mise en ligne sur https://nano-adventure.vercel.app/
 
 ## Crédits
-Globe : « Low Poly Planet Earth » par Jacobs Development (CC BY 4.0). Avion : « Airplane » par Poly by Google (CC BY 3.0).
+Globe : « Low Poly Planet Earth » par Jacobs Development (CC BY 4.0). Avion : « Buseness Jet » par Yo.Ri, Sketchfab (CC BY 4.0).

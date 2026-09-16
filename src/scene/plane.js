@@ -19,6 +19,12 @@ export function buildProceduralPlane() {
 }
 
 function normalizeGlb(sceneObj) {
+  // Les matériaux métalliques (exports Sketchfab) rendent noirs sans carte d'environnement : on les rend mats.
+  sceneObj.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) { if ('metalness' in m) { m.metalness = 0; m.roughness = Math.max(m.roughness ?? 0.5, 0.5); m.needsUpdate = true; } }
+  });
   const box = new THREE.Box3().setFromObject(sceneObj);
   const size = new THREE.Vector3(); box.getSize(size);
   const center = new THREE.Vector3(); box.getCenter(center);

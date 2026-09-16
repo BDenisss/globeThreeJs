@@ -20,4 +20,4 @@ export const mystery = {
   destination: { lat: 62.5074, lon: 6},
 };
 
-export const credits = "Globe : Jacobs Development · Avion : Poly by Google — CC BY";
+export const credits = "Globe : Jacobs Development · Avion : Yo.Ri — CC BY";
