@@ -20,6 +20,7 @@ import { createSecretVault } from './app/secret.js';
 import { createLockCard } from './ui/lockCard.js';
 import { createKeypad } from './ui/keypad.js';
 import { createQuestionMark, createBurst, createDestinationMarker } from './scene/effects.js';
+import { createTrail } from './scene/trail.js';
 import { createTicket } from './ui/ticket.js';
 import { runUnlockSequence } from './app/unlock.js';
 import { createIntro } from './ui/intro.js';
@@ -37,7 +38,7 @@ if (!hasWebGL()) {
 
 if (new URLSearchParams(location.search).has('reset')) {
   persist.reset(); location.replace(location.pathname);
-  throw new Error('reset');   // stoppe le module : sinon renderer, fetch et modèles démarrent pour rien pendant la navigation
+  await new Promise(() => {});   // la navigation prend le relais ; on n'exécute rien de plus   // stoppe le module : sinon renderer, fetch et modèles démarrent pour rien pendant la navigation
 }
 // Déclaré tôt : utilisé par le « ? » (chargement) et par le coffre (état).
 const unlocked = persist.isUnlocked();
@@ -117,7 +118,10 @@ const marker = createDestinationMarker(markerVec);
 globe.root.add(marker.object);
 if (unlocked) marker.show();
 const bursts = [];
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const trail = createTrail();
+globe.root.add(trail.object);
+// `?anim` force les animations complètes même si le système déclare « mouvement réduit ».
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches && !new URLSearchParams(location.search).has('anim');
 // `import.meta.env.DEV` répété ici (en plus de isDebug()) : replié en dur par Vite au build, ce qui permet
 // au bundler d'éliminer statiquement tout cet appel (et OrbitControls) du bundle de production.
 const debug = import.meta.env.DEV && isDebug()
@@ -140,6 +144,7 @@ function startFlight({ from, to, backwards }) {
       plane.setPose(p);
       rig.setDirection(toWorldDir(p.position));
       rig.setZoomOut(reducedMotion ? 0 : Math.sin(Math.PI * e));   // recul en cloche : 1,6× à mi-vol, retour sur l'étape à l'arrivée
+      if (!reducedMotion) trail.push(p.position, p.scale);
     },
     onDone() { flightProgress = 0; rig.setZoomOut(0); store.dispatch({ type: 'ARRIVED' }); },
   });
@@ -184,7 +189,7 @@ store.subscribe((state, prev) => {
   if (!state.lockOpen && prev.lockOpen) keypad.close();
   if (state.phase === 'UNLOCKING' && prev.phase !== 'UNLOCKING') {
     runUnlockSequence({
-      qmark, lockCard, flights, plane, rig, toWorldDir, waitVec, finalVec, liftOf, reducedMotion,
+      qmark, lockCard, flights, plane, rig, trail, toWorldDir, waitVec, finalVec, liftOf, reducedMotion,
       onProgress: (e) => { flightProgress = e; },
       onArrive: () => {
         if (!reducedMotion) { const b = createBurst(finalVec); globe.root.add(b.object); bursts.push(b); }
@@ -218,6 +223,7 @@ renderer.setAnimationLoop((now) => {
   flights.update(dt);
   const st = store.get();
   qmark.update(dt, now / 1000);
+  trail.update(dt);
   for (let i = bursts.length - 1; i >= 0; i--) {
     if (bursts[i].update(dt)) { globe.root.remove(bursts[i].object); bursts.splice(i, 1); }
   }
