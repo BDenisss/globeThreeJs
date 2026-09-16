@@ -49,8 +49,9 @@ export function createPlane(model) {
   let restLen = 1.13;
   return {
     object,
-    setPose({ position, target: t, up, roll }) {
+    setPose({ position, target: t, up, roll, scale = 1 }) {
       object.position.set(position.x, position.y, position.z);
+      object.scale.setScalar(scale);
       object.up.set(up.x, up.y, up.z);
       target.set(t.x, t.y, t.z);
       object.lookAt(target);        // pour un Object3D, +Z regarde la cible

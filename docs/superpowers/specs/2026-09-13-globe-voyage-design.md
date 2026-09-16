@@ -82,7 +82,7 @@ Principe : **`state.js` et `lib/*` ne dépendent pas de three.js ni du DOM** ; i
 
 - `latLonToVec3(lat, lon, r)` → `{x, y, z}` : `x = r cos(lat) sin(lon)`, `y = r sin(lat)`, `z = r cos(lat) cos(lon)` (angles en radians).
 - `slerp(a, b, t)` : interpolation sphérique entre deux vecteurs unitaires (arc de grand cercle).
-- `arcPoint(a, b, t, lift, base = 1)` : point sur l'arc à `t ∈ [0,1]`, altitude `base + lift · sin(π t)` — l'avion monte puis redescend (base 1,13 pour l'avion) ; `lift` dépend de la longueur de l'arc (`0.08 + 0.3 · angle/π`, borné à 0,35).
+- `arcPoint(a, b, t, lift, base = 1)` : point sur l'arc à `t ∈ [0,1]`, altitude `base + lift · sin(π t)` — l'avion monte puis redescend (base 1,13 pour l'avion) ; `lift` dépend de la longueur de l'arc (`0.04 + 0.13 · angle/π`, borné à 0,15 — « légèrement courbé »).
 - `arcLength(a, b)` : angle entre les deux vecteurs (pour proportionner la durée du vol).
 
 ### 4.3 Route (`scene/route.js`)
@@ -95,7 +95,7 @@ Principe : **`state.js` et `lib/*` ne dépendent pas de three.js ni du DOM** ; i
 
 - glTF low-poly, mis à l'échelle pour une envergure ≈ 0,12 unité ; matériaux de l'asset conservés, avec une légère teinte dorée sur le fuselage si l'asset est blanc (paramètre).
 - Posé à une étape : à l'altitude 1,13 au-dessus du point, nez orienté vers la prochaine étape.
-- En vol : position = `arcPoint(a, b, ease(t), lift)` ; orientation = `lookAt(position suivante)` avec « up » = normale au globe ; **inclinaison** (roll) = `15° · sin(π t)` — nulle au décollage et à l'atterrissage, maximale à mi-vol (sur un grand cercle il n'y a pas de virage réel ; l'inclinaison est un effet de style, stable et indépendant de la cadence d'images). Durée = `1.2 s + 2.6 s · angle/π` (Paris → Malaisie ≈ 2,5 s, Shanghai → Paris ≈ 2,4 s, Paris → Barcelone ≈ 1,3 s). Retour arrière : même arc à l'envers, durée × 0,6.
+- En vol : position = `arcPoint(a, b, ease(t), lift)` ; orientation = `lookAt(position suivante)` avec « up » = normale au globe ; **inclinaison** (roll) = `15° · sin(π t)` — nulle au décollage et à l'atterrissage, maximale à mi-vol (sur un grand cercle il n'y a pas de virage réel ; l'inclinaison est un effet de style, stable et indépendant de la cadence d'images). Durée = `2 s + 5,9 s · angle/π` (Paris → Malaisie ≈ 5 s, Shanghai → Paris ≈ 4,7 s, Paris → Barcelone ≈ 2,3 s), easing quartique (départ et arrivée très lents, milieu rapide). Retour arrière : même arc à l'envers, durée × 0,7. **Apparition** : l'avion passe de 5 % à 100 % de sa taille pendant les 20 premiers % du vol (la montée).
 - Point d'attente (état `LOCKED`) : l'avion flotte (oscillation verticale ±0,01, période 2 s) devant le « ? ».
 
 ### 4.5 Point d'attente et « ? »
@@ -106,7 +106,7 @@ Pour ne pas trahir la destination, le point d'attente n'est **pas** sur la traje
 
 - `PerspectiveCamera` (fov 45 portrait / 38 paysage), toujours orientée vers le centre du globe.
 - Position cible : sur la droite centre → étape courante, à distance `D` (2,6 en portrait mobile, 2,2 en paysage/desktop), avec un décalage vertical pour laisser la place à la carte d'étape en bas (le globe est légèrement remonté à l'écran).
-- Transition : la caméra `slerp` d'une direction à l'autre pendant le vol, sur la même durée que l'avion, easing `easeInOutCubic` ; l'avion reste donc au centre de l'écran.
+- Transition : la caméra suit la direction de l'avion (lissage exponentiel) ; l'avion reste donc au centre de l'écran. **Recul en cloche** pendant le vol : distance = distance d'étape × (1 + 0,6 · sin(π · progression)) — 1,6× à mi-vol, retour exact sur l'étape à l'arrivée.
 - Pendant `INTRO` : la caméra recule pour que le globe entier soit visible quel que soit le format : `D = 1,136 × 1,08 / sin(min(fov/2, atan(tan(fov/2) · aspect)))` (≈ 6,0 en portrait 375 × 812, ≈ 3,5 en paysage), recalculé à chaque redimensionnement.
 - Pas d'`OrbitControls` libres : l'utilisateur ne fait pas tourner le globe à la main (sinon les swipes de navigation entrent en conflit). Un drag horizontal lent (> 300 ms sans relâcher) est ignoré ; un swipe rapide navigue.
 
@@ -233,7 +233,7 @@ Note : `mystery.destination` (lat/lon de Londres) est en clair dans `content.js`
 - Paysage / desktop : carte en colonne à droite (320 px), timeline en bas, le globe centré dans l'espace restant.
 - `ResizeObserver` sur le conteneur ; `camera.aspect` et `fov` mis à jour ; `visualViewport` sur iOS pour ignorer la barre Safari.
 - Budget : < 3 Mo transférés au total (globe 0,9 Mo + avion < 0,5 Mo + three ≈ 0,6 Mo gzip + polices), 60 fps sur iPhone récent, ≥ 30 fps sur iPhone de 2019.
-- `prefers-reduced-motion` : vols ramenés à 0,4 s, particules désactivées, globe immobile.
+- `prefers-reduced-motion` : vols deux fois plus courts (× 0,5 — pas 0,15 : sur un Windows dont les « effets d'animation » sont coupés, le site restait regardable mais les vols devenaient instantanés), pas de recul de caméra pendant le vol, particules désactivées, globe immobile.
 - Pas de WebGL : message plein écran « Ton navigateur ne peut pas afficher le globe — essaie avec Safari ou Chrome. » (pas de fallback 2D).
 - Textures/géométries `dispose()` non nécessaires (scène unique, pas de changement de page).
 

@@ -133,14 +133,15 @@ function restAt(stop) {
 function startFlight({ from, to, backwards }) {
   const a = vecOf(from), b = vecOf(to), lift = liftOf(a, b);
   flights.start({
-    from: a, to: b, backwards, durationScale: reducedMotion ? 0.15 : 1,
+    from: a, to: b, backwards, durationScale: reducedMotion ? 0.5 : 1,   // mouvement réduit : vols deux fois plus courts, sans recul de caméra
     onProgress(e) {
       flightProgress = e;
       const p = planePose(a, b, e, lift);
       plane.setPose(p);
       rig.setDirection(toWorldDir(p.position));
+      rig.setZoomOut(reducedMotion ? 0 : Math.sin(Math.PI * e));   // recul en cloche : 1,6× à mi-vol, retour sur l'étape à l'arrivée
     },
-    onDone() { flightProgress = 0; store.dispatch({ type: 'ARRIVED' }); },
+    onDone() { flightProgress = 0; rig.setZoomOut(0); store.dispatch({ type: 'ARRIVED' }); },
   });
 }
 

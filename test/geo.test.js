@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   latLonToVec3, toLatLon, slerp, arcPoint, angleBetween, liftFor, flightDuration, length,
 } from '../src/lib/geo.js';
-import { easeInOutCubic, clamp01 } from '../src/lib/ease.js';
+import { easeInOutCubic, easeInOutQuart, clamp01 } from '../src/lib/ease.js';
 
 const PARIS = { lat: 48.8566, lon: 2.3522 };
 const TOKYO = { lat: 35.6762, lon: 139.6503 };
@@ -54,18 +54,25 @@ describe('slerp / arcPoint', () => {
 });
 
 describe('durées et altitude', () => {
-  it('liftFor croît avec l angle et plafonne à 0.35', () => {
-    expect(near(liftFor(0), 0.08)).toBe(true);
-    expect(near(liftFor(Math.PI), 0.35)).toBe(true);
-    expect(liftFor(Math.PI / 2)).toBeGreaterThan(0.2);
+  it('liftFor : arc légèrement bombé, croît avec l angle et plafonne à 0.15', () => {
+    expect(near(liftFor(0), 0.04)).toBe(true);
+    expect(near(liftFor(Math.PI), 0.15)).toBe(true);
+    expect(liftFor(Math.PI / 2)).toBeGreaterThan(0.09);
+    expect(liftFor(Math.PI / 2)).toBeLessThan(0.12);
   });
-  it('flightDuration : 1.2 s + 2.6 s·angle/π, ×0.6 en arrière', () => {
-    expect(near(flightDuration(Math.PI / 2), 2.5)).toBe(true);
-    expect(near(flightDuration(Math.PI / 2, true), 1.5)).toBe(true);
+  it('flightDuration : 2 s + 5.9 s·angle/π, ×0.7 en arrière (Paris → KL ≈ 5 s)', () => {
+    expect(near(flightDuration(Math.PI / 2), 4.95)).toBe(true);
+    expect(near(flightDuration(Math.PI / 2, true), 4.95 * 0.7)).toBe(true);
+    const parisKL = angleBetween(latLonToVec3(48.86, 2.35), latLonToVec3(3.14, 101.69));
+    expect(Math.abs(flightDuration(parisKL) - 5)).toBeLessThan(0.15);
   });
-  it('easeInOutCubic symétrique, clamp01 borne', () => {
+  it('easeInOutCubic et easeInOutQuart symétriques, quart plus lent aux extrémités, clamp01 borne', () => {
     expect(near(easeInOutCubic(0.5), 0.5)).toBe(true);
     expect(easeInOutCubic(0)).toBe(0); expect(easeInOutCubic(1)).toBe(1);
+    expect(near(easeInOutQuart(0.5), 0.5)).toBe(true);
+    expect(easeInOutQuart(0)).toBe(0); expect(easeInOutQuart(1)).toBe(1);
+    expect(easeInOutQuart(0.15)).toBeLessThan(easeInOutCubic(0.15));
+    expect(easeInOutQuart(0.85)).toBeGreaterThan(easeInOutCubic(0.85));
     expect(clamp01(-2)).toBe(0); expect(clamp01(9)).toBe(1);
   });
 });

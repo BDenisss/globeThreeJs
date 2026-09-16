@@ -29,12 +29,13 @@ export function slerp(a, b, t) {
   if (so < 1e-6) return normalize(add(scale(ua, 1 - t), scale(ub, t)));
   return add(scale(ua, Math.sin((1 - t) * om) / so), scale(ub, Math.sin(t * om) / so));
 }
-// Bombement de l'arc selon sa longueur (rad), plafonné.
-export const liftFor = (angle) => Math.min(0.35, 0.08 + 0.3 * angle / Math.PI);
+// Bombement de l'arc selon sa longueur (rad), léger et plafonné (≈ 0,10 pour Paris → KL).
+export const liftFor = (angle) => Math.min(0.15, 0.04 + 0.13 * angle / Math.PI);
 // Point de l'arc à t ∈ [0,1], altitude base + lift·sin(πt).
 export function arcPoint(a, b, t, lift, base = 1) {
   return scale(slerp(a, b, t), base + lift * Math.sin(Math.PI * t));
 }
+// Durée d'un vol (s) : 2 s + 5,9 s·angle/π → Paris → Barcelone ≈ 2,3 s, Paris → KL ≈ 5 s ; retour en arrière × 0,7.
 export function flightDuration(angle, backwards = false) {
-  return (1.2 + 2.6 * angle / Math.PI) * (backwards ? 0.6 : 1);
+  return (2.0 + 5.9 * angle / Math.PI) * (backwards ? 0.7 : 1);
 }

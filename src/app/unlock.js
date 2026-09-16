@@ -7,14 +7,15 @@ export function runUnlockSequence({ qmark, lockCard, flights, plane, rig, toWorl
   const lift = liftOf(waitVec, finalVec);
   setTimeout(() => {
     flights.start({
-      from: waitVec, to: finalVec, durationScale: reducedMotion ? 0.15 : 1,
+      from: waitVec, to: finalVec, durationScale: reducedMotion ? 0.5 : 1,
       onProgress(e) {
         onProgress(e);
         const p = planePose(waitVec, finalVec, e, lift);
         plane.setPose(p);
         rig.setDirection(toWorldDir(p.position));
+        rig.setZoomOut(reducedMotion ? 0 : Math.sin(Math.PI * e));
       },
-      onDone() { onProgress(1); onArrive(); setTimeout(onLanded, 500); },   // 1 : le segment reste tracé jusqu à LANDED
+      onDone() { onProgress(1); rig.setZoomOut(0); onArrive(); setTimeout(onLanded, 500); },   // 1 : le segment reste tracé jusqu à LANDED
     });
   }, 400);
 }

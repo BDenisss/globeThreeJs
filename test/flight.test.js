@@ -8,7 +8,7 @@ describe('flight runner', () => {
     const seen = []; let done = 0;
     r.start({ from: latLonToVec3(48.86, 2.35), to: latLonToVec3(3.14, 101.69), onProgress: (e) => seen.push(e), onDone: () => done++ });
     expect(r.active()).toBe(true);
-    for (let i = 0; i < 100; i++) r.update(0.05);   // 5 s > durée (≈2.5 s)
+    for (let i = 0; i < 160; i++) r.update(0.05);   // 8 s > durée (≈5 s)
     expect(done).toBe(1);
     expect(r.active()).toBe(false);
     expect(seen[0]).toBeGreaterThanOrEqual(0);
@@ -19,7 +19,7 @@ describe('flight runner', () => {
     const r = createFlightRunner();
     let done = 0;
     r.start({ from: latLonToVec3(0, 0), to: latLonToVec3(0, 90), durationScale: 0.1, onProgress() {}, onDone: () => done++ });
-    for (let i = 0; i < 10; i++) r.update(0.05);   // 0.5 s
+    for (let i = 0; i < 12; i++) r.update(0.05);   // 0.6 s > 4.95 s × 0.1
     expect(done).toBe(1);
   });
 });

@@ -9,9 +9,13 @@ export function createCameraRig(camera) {
   let mode = 'intro', portrait = true;
   let dir = { x: 0, y: 0.25, z: 1 }, targetDir = dir;
   let distance = introDistance, targetDistance = introDistance, lookY = 0;
+  // Recul pendant un vol : 0 = distance d'étape, 1 = 1,6× (mi-vol).
+  let zoomOut = 0;
+  const ZOOM_OUT_MAX = 0.6;
   const pos = new THREE.Vector3();
   const refresh = () => {
-    targetDistance = mode === 'intro' ? introDistance : portrait ? DIST.portrait : DIST.landscape;
+    const base = mode === 'intro' ? introDistance : portrait ? DIST.portrait : DIST.landscape;
+    targetDistance = base * (1 + ZOOM_OUT_MAX * zoomOut);
     lookY = mode === 'intro' || !portrait ? 0 : -0.3;
   };
   return {
@@ -29,6 +33,8 @@ export function createCameraRig(camera) {
     },
     setMode(m) { mode = m; refresh(); },
     setDirection(v, immediate = false) { targetDir = normalize(v); if (immediate) dir = targetDir; },
+    // f ∈ [0,1] : facteur de recul (en cloche pendant le vol, 0 à l'arrivée).
+    setZoomOut(f) { zoomOut = Math.min(1, Math.max(0, f)); refresh(); },
     update(dt) {
       const k = 1 - Math.exp(-6 * dt);
       dir = slerp(dir, targetDir, k);

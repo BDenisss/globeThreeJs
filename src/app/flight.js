@@ -1,5 +1,5 @@
 import { angleBetween, liftFor, flightDuration, arcPoint } from '../lib/geo.js';
-import { easeInOutCubic, clamp01 } from '../lib/ease.js';
+import { easeInOutQuart, clamp01 } from '../lib/ease.js';
 
 export function createFlightRunner() {
   let cur = null;
@@ -13,7 +13,7 @@ export function createFlightRunner() {
       if (!cur) return;
       cur.elapsed += dt;
       const t = clamp01(cur.elapsed / cur.duration);
-      const e = easeInOutCubic(t);
+      const e = easeInOutQuart(t);
       cur.onProgress(e, arcPoint(cur.from, cur.to, e, cur.lift), cur);
       if (t >= 1) { const f = cur; cur = null; f.onDone(); }
     },
