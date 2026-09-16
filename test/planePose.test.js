@@ -23,13 +23,17 @@ describe('planePose', () => {
     expect(planePose(a, b, 0, 0.2).roll).toBeCloseTo(0, 6);
     expect(planePose(a, b, 0.5, 0.2).roll).toBeCloseTo(15 * Math.PI / 180, 6);
   });
-  it('échelle : 5 % au décollage, 100 % dès 20 % du vol et au repos', () => {
-    expect(planePose(a, b, 0, 0.2).scale).toBeCloseTo(0.05, 6);
-    expect(planePose(a, b, 0.1, 0.2).scale).toBeGreaterThan(0.05);
+  it('échelle : petit au repos et aux extrémités du vol, 100 % entre 20 % et 80 %', () => {
+    expect(restPose(a, b).scale).toBeCloseTo(0.1, 6);
+    expect(planePose(a, b, 0, 0.2).scale).toBeCloseTo(0.1, 6);
+    expect(planePose(a, b, 0.1, 0.2).scale).toBeGreaterThan(0.1);
     expect(planePose(a, b, 0.1, 0.2).scale).toBeLessThan(1);
     expect(planePose(a, b, 0.2, 0.2).scale).toBeCloseTo(1, 6);
-    expect(planePose(a, b, 0.7, 0.2).scale).toBe(1);
-    expect(restPose(a, b).scale).toBe(1);
+    expect(planePose(a, b, 0.5, 0.2).scale).toBe(1);
+    expect(planePose(a, b, 0.8, 0.2).scale).toBeCloseTo(1, 6);
+    expect(planePose(a, b, 0.9, 0.2).scale).toBeLessThan(1);
+    expect(planePose(a, b, 0.9, 0.2).scale).toBeGreaterThan(0.1);
+    expect(planePose(a, b, 1, 0.2).scale).toBeCloseTo(0.1, 6);
   });
   it('restPose pose à l altitude demandée, orienté vers la prochaine étape', () => {
     const r = restPose(a, b, 1.13);
